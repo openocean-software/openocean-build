@@ -1,62 +1,225 @@
-This work was packaged for Debian by:
+# Note (TES): This file was generated with assistance from Claude Sonnet 5 and licensecheck against the MOOS-IvP 24.8.1 release
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: moos-ivp
+Upstream-Contact: MOOS-IvP developers <licensing@moos-ivp.org>
+Source: https://github.com/moos-ivp/moos-ivp
+# Remove bundled copy of Proj
+Files-Excluded: MOOS_Jul2724/proj-5.2.0/*
+ MOOS_Jul0519/proj-5.2.0/*
+# ============================================================
+# NOTE:
+#
+# This needs attention before this could go to the Debian
+# archive:
+#
+# 1. UNRESOLVED NON-FREE FILES. The following files carry an explicit
+#    proprietary/all-rights-reserved header ("This is unreleased BETA
+#    code. No permission is granted or implied to use, copy, modify,
+#    and distribute this software except by the author(s)..."),
+#    which directly contradicts the GPLv3/LGPLv3 claim in COPYING.md:
+#      ivp/src/lib_helmivp/PMGen_Holonomic.{cpp,h}
+#      ivp/src/lib_helmivp/PMGen_Dubins.{cpp,h}
+#      ivp/src/lib_helmivp/PMGen.{cpp,h}
+#      ivp/src/lib_helmivp/PlatModelGenerator.{cpp,h}
+#      ivp/src/lib_behaviors-colregs/VelocityFilter.{cpp,h}
+#      ivp/src/lib_survey/SurveyGenerator.h
+#      ivp/src/lib_dep_behaviors/BHV_FixTurn.{cpp,h}
+#    These are NOT DFSG-free as written and must not be included in a
+#    Debian upload as-is.
+#
+# 2. FLTKCheckList.{cpp,h} and MOOSFLTKUI.h in the same libFLTKVW
+#    directory carry NO copyright or license notice at all. These appear to
+#    be MOOS-specific additions layered on top of Charlton's Flv_* widget
+#    code, but nothing in the files themselves states under what terms
+#    they're offered. This needs a resolution before upload: ask upstream
+#    to add a notice, or treat as implicitly covered by the surrounding
+#    LGPL-2+ material only if you're comfortable with that inference -
+#    do not silently assume a license for unmarked files in a real
+#    submission.
+#
+# This file is a starting point, not a final review. Before upload,
+# run `licensecheck -r .` and/or `cme fix dpkg-copyright` over a full
+# checkout and reconcile the output against this file - a project this
+# size, with 5000+ commits and many contributors, will have edge cases
+# this scan did not catch.
+# ============================================================
 
-    Toby Schneider <tes.aubergine@gmail.com> on Tue, 08 May 2012 08:00:11 -0500
+# ------------------------------------------------------------
+# IvP Helm, MOOS applications, behaviors, and utilities (GPLv3+)
+# ------------------------------------------------------------
+Files: ivp/*
+Copyright: 2001-2026 Michael Benjamin <mikerb@mit.edu>
+           2001-2026 Dept. of Mechanical Engineering, MIT, Cambridge MA
+           2001-2026 CSAIL, MIT, Cambridge MA
+License: GPL-3+
 
-It was downloaded from:
+Files: editor-modes/*
+Copyright: 2014 Jacob Gerlach
+           2014 Michael Benjamin
+License: GPL-3+
 
-    http://moos-ivp.org
+# ------------------------------------------------------------
+# MOOS core middleware (vendored snapshots): libraries under LGPL-2.1,
+# no "or later" clause found in the scanned headers.
+# ------------------------------------------------------------
+Files: MOOS_Jul2724/MOOSCore/* MOOS_Jul2724/MOOSEssentials/*
+ MOOS_Jul2724/MOOSToolsUI/* MOOS_Jul2724/MOOSMatlab/*
+ MOOS_Jul0519/MOOSCore/* MOOS_Jul0519/MOOSEssentials/*
+ MOOS_Jul0519/MOOSToolsUI/* MOOS_Jul0519/MOOSMatlab/*
+Copyright: 2001-2002 Paul Newman, MIT
+           2003-2013 Paul Newman, University of Oxford
+License: LGPL-2.1
 
-Upstream Author(s):
+# MOOSGeodesy.{cpp,h} carries a GPL-2+ header rather than LGPL-2.1 -
+# an outlier within the MOOS core tree
+Files: MOOS_Jul2724/MOOSGeodesy/* MOOS_Jul0519/MOOSGeodesy/*
+Copyright: 2001-2005 Massachusetts Institute of Technology
+           2001-2005 Oxford University
+           2001-2005 Paul Newman
+License: GPL-2+
 
-    Lead: Michael R. Benjamin <mikerb@mit.edu>
-    Contributors: Henrik Schmidt <henrik@mit.edu>
-                  John Leonard
+# GetPot command-line/config parser, vendored under MOOS core
+Files: */MOOSCore/Core/libMOOS/Thirdparty/getpot/*
+Copyright: 2001-2016 Frank-Rene Schaefer
+License: Expat
 
-Copyright:
-    Michael Benjamin, Henrik Schmidt, and John Leonard
-    Dept of Mechanical Eng / CSAIL, MIT Cambridge MA 
+# PocoBits: a vendored slice of POCO's Foundation library (threading/event
+# primitives), under MOOS core
+Files: */MOOSCore/Core/libMOOS/Thirdparty/PocoBits/*
+Copyright: 2004-2009 Applied Informatics Software Engineering GmbH and Contributors
+License: BSL-1.0
 
-License:
-    Most files are licensed under the GPL version 2 or later (see "/usr/share/common-licences/GPL-2")
- 
-    Exceptions:
-    - lib_behaviors       
-    - lib_helmivp
-    - lib_ivpcore
-    
-    These libraries are given under a non-commercial license which does not qualify under the Debian Free Software Guidelines. Thus, this package cannot be included within Debian until these licenses are amended or the relevant libraries removed. The text of this license is:
+# libFLTKVW: vendored FLTK list/table widget (Flv_*), under MOOSToolsUI
+Files: */MOOSToolsUI/Tools/Graphical/Thirdparty/libFLTKVW/Flv_*
+ */MOOSToolsUI/Tools/Graphical/Thirdparty/libFLTKVW/include/MOOS/libFLTKVW/Flv_*
+Copyright: 1999 Laurence Charlton
+License: LGPL-2+
 
-    The algorithms embodied in this software are protected under  
-    U.S. Pat. App. Ser. Nos. 10/631,527 and 10/911,765 and are    
-    the property of the United States Navy.                       
-                                                               
-    Permission to use, copy, modify and distribute this software  
-    and its documentation for any non-commercial purpose, without 
-    fee, and without a written agreement is hereby granted        
-    provided that the above notice and this paragraph and the     
-    following three paragraphs appear in all copies.              
-                                                               
-    Commercial licences for this software may be obtained by      
-    contacting Patent Counsel, Naval Undersea Warfare Center      
-    Division Newport at 401-832-4736 or 1176 Howell Street,       
-    Newport, RI 02841.                                            
-                                                               
-    In no event shall the US Navy be liable to any party for      
-    direct, indirect, special, incidental, or consequential       
-    damages, including lost profits, arising out of the use       
-    of this software and its documentation, even if the US Navy   
-    has been advised of the possibility of such damage.           
-                                                               
-    The US Navy specifically disclaims any warranties, including, 
-    but not limited to, the implied warranties of merchantability 
-    and fitness for a particular purpose. The software provided   
-    hereunder is on an 'as-is' basis, and the US Navy has no      
-    obligations to provide maintenance, support, updates,         
-    enhancements or modifications.    
+# ------------------------------------------------------------
+# Debian packaging
+# ------------------------------------------------------------
+Files: debian/*
+Copyright: 2026 Toby Schneider <toby@oceansoft.org>
+License: GPL-3+
 
-The Debian packaging is:
+# ------------------------------------------------------------
+# License texts
+# ------------------------------------------------------------
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program. If not, see <https://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 3 can be found in "/usr/share/common-licenses/GPL-3".
 
-    Copyright (C) 2012 Toby Schneider <tes.aubergine@gmail.com>
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program. If not, see <https://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 2 can be found in "/usr/share/common-licenses/GPL-2".
 
-and is licensed under the GPL version 3,
-see "/usr/share/common-licenses/GPL-3".
+License: LGPL-2+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Library General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ Library General Public License for more details.
+ .
+ You should have received a copy of the GNU Library General Public
+ License along with this library. If not, see
+ <https://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Library General
+ Public License version 2 can be found in
+ "/usr/share/common-licenses/LGPL-2".
+
+License: LGPL-2.1
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library. If not, see
+ <https://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License version 2.1 can be found in
+ "/usr/share/common-licenses/LGPL-2.1".
+
+License: BSL-1.0
+ Permission is hereby granted, free of charge, to any person or
+ organization obtaining a copy of the software and accompanying
+ documentation covered by this license (the "Software") to use,
+ reproduce, display, distribute, execute, and transmit the Software,
+ and to prepare derivative works of the Software, and to permit
+ third-parties to whom the Software is furnished to do so, all
+ subject to the following:
+ .
+ The copyright notices in the Software and this entire statement,
+ including the above license grant, this restriction and the
+ following disclaimer, must be included in all copies of the
+ Software, in whole or in part, and all derivative works of the
+ Software, unless such copies or derivative works are solely in the
+ form of machine-executable object code generated by a source
+ language processor.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND
+ NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR ANYONE
+ DISTRIBUTING THE SOFTWARE BE LIABLE FOR ANY DAMAGES OR OTHER
+ LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ IN THE SOFTWARE.
+
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
+ .
+ The above copyright notice and this permission notice shall be
+ included in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.

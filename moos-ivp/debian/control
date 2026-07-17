@@ -16,7 +16,8 @@ Homepage: http://moos-ivp.org
 Vcs-Git: https://github.com/moos-ivp/moos-ivp.git
 Vcs-Browser: https://github.com/moos-ivp/moos-ivp
 
-Package: libmoos10
+Package: libmoos10-mit
+Provides: libmoos10
 Architecture: any
 Section: libs
 Multi-Arch: same
@@ -26,7 +27,8 @@ Description: Cross Platform Software for Robotics Research.
  However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
  This packages contains the MOOS library (libMOOS) for the redesigned version 10 of MOOS.
 
-Package: libmoos10-dbg
+Package: libmoos10-mit-dbg
+Provides: libmoos10-dbg
 Architecture: any
 Section: debug
 Multi-Arch: same
@@ -37,10 +39,9 @@ Description: Cross Platform Software for Robotics Research.
  However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
  This packages contains the MOOS library (libMOOS) for the redesigned version 10 of MOOS with the debugging symbols still intact.
 
-
-Package: libmoos10-dev
+Package: libmoos10-mit-dev
+Provides: libmoos10-dev
 Architecture: any
-Provides: libmoos-dev
 Section: libdevel
 Multi-Arch: same
 Depends: libmoos10 (=${binary:Version}),
@@ -50,7 +51,8 @@ Description: Cross Platform Software for Robotics Research.
  However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
  This packages contains the MOOS library header files for the redesigned version 10 of MOOS.
 
-Package: moos10-tools
+Package: moos10-mit-tools
+Provides: moos10-tools
 Architecture: any
 Section: science
 Depends: ${shlibs:Depends}, ${misc:Depends}
@@ -59,7 +61,8 @@ Description: Cross Platform Software for Robotics Research.
  However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
  This packages contains the various command line tools included with MOOS.
 
-Package: moosdb10
+Package: moosdb10-mit
+Provides: moosdb10
 Architecture: any
 Section: science
 Depends: ${shlibs:Depends}, ${misc:Depends}

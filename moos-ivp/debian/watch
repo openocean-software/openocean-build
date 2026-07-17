@@ -1,0 +1,8 @@
+version=4
+opts="filenamemangle=s/.*\/v?(\d[\d.]*)\.tar\.gz/moos-ivp-$1.tar.gz/,\
+uversionmangle=s/$/+dfsg/,\
+repack,\
+compression=gzip,\
+dversionmangle=s/\+dfsg$//" \
+https://github.com/moos-ivp/moos-ivp/tags \
+.*/v?(\d[\d.]*)\.tar\.gz
