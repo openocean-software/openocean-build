@@ -1,0 +1,32 @@
+--- a/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uIndexedPlayBack/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uIndexedPlayBack/CMakeLists.txt
+@@ -39,6 +39,7 @@ IF(FLTK_FOUND)
+    
+     TARGET_LINK_LIBRARIES(${EXEC} ${MOOS_LIBRARIES} ${MOOS_DEPEND_LIBRARIES} ${fltkvw_LIBRARIES} ${alogTools_LIBRARIES} ${alogTools_DEPEND_LIBRARIES} ${fltkvw_DEPEND_LIBRARIES}  )
+ 
++    INSTALL(TARGETS ${EXEC} RUNTIME DESTINATION bin )
+  
+ ELSE(FLTK_FOUND)
+    MESSAGE("${EXEC} won't be built as FLTK was not found.")
+--- a/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uMS/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uMS/CMakeLists.txt
+@@ -29,6 +29,8 @@ IF(FLTK_FOUND)
+    # Link the executable
+    TARGET_LINK_LIBRARIES( uMS ${MOOS_LIBRARIES} ${MOOS_DEPEND_LIBRARIES} ${fltkvw_LIBRARIES} ${fltkvw_DEPEND_LIBRARIES}  )
+ 
++   INSTALL(TARGETS uMS RUNTIME DESTINATION bin )
++
+ ELSE(FLTK_FOUND)
+     
+    MESSAGE("uMS won't be built as FLTK was not found.")
+--- a/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uPlayBack/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSToolsUI/Tools/Graphical/uPlayBack/CMakeLists.txt
+@@ -37,7 +37,7 @@ IF(FLTK_FOUND)
+     ADD_EXECUTABLE( ${EXEC} WIN32 ${UPLAYBACK_SRCS})   
+    
+     TARGET_LINK_LIBRARIES(${EXEC} ${MOOS_LIBRARIES} ${MOOS_DEPEND_LIBRARIES} ${fltkvw_LIBRARIES} ${fltkvw_DEPEND_LIBRARIES}  )
+-
++    INSTALL(TARGETS ${EXEC} RUNTIME DESTINATION bin )
+  
+ ELSE(FLTK_FOUND)
+    MESSAGE("${EXEC} won't be built as FLTK was not found.")

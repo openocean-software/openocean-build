@@ -12,6 +12,14 @@ IVP_SRC_DIR=$(CURDIR)/ivp/src
 IVP_BUILD_DIR = $(CURDIR)/build/ivp
 IVP_CMAKE_EXTRA_FLAGS = -DIVP_BUILD_GUI_CODE=ON -DMOOS_DIR=$(MOOS_CORE_BUILD_DIR) -DMOOSGeodesy_DIR=$(MOOS_GEODESY_BUILD_DIR)
 
+MOOS_ESSENTIALS_SRC_DIR=$(CURDIR)/MOOS/MOOSEssentials
+MOOS_ESSENTIALS_BUILD_DIR=$(CURDIR)/build/MOOS/MOOSEssentials
+MOOS_ESSENTIALS_CMAKE_EXTRA_FLAGS=-DMOOS_DIR=$(MOOS_CORE_BUILD_DIR)
+
+MOOS_TOOLSUI_SRC_DIR=$(CURDIR)/MOOS/MOOSToolsUI
+MOOS_TOOLSUI_BUILD_DIR=$(CURDIR)/build/MOOS/MOOSToolsUI
+MOOS_TOOLSUI_CMAKE_EXTRA_FLAGS=-DMOOS_DIR=$(MOOS_CORE_BUILD_DIR) -DBUILD_CONSOLE_TOOLS=ON -DFLTK_SKIP_FLUID=ON -DBUILD_GRAPHICAL_TOOLS=ON -DBUILD_UPB=ON
+
 %:
 	dh $@
 
@@ -19,20 +27,28 @@ override_dh_auto_configure:
 	dh_auto_configure --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR) -- $(MOOS_CORE_CMAKE_EXTRA_FLAGS)
 	dh_auto_configure --sourcedirectory=$(MOOS_GEODESY_SRC_DIR) --builddirectory=$(MOOS_GEODESY_BUILD_DIR) -- $(MOOS_GEODESY_CMAKE_EXTRA_FLAGS)
 	dh_auto_configure --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR) -- $(IVP_CMAKE_EXTRA_FLAGS)
+	dh_auto_configure --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR) -- $(MOOS_ESSENTIALS_CMAKE_EXTRA_FLAGS)
+	dh_auto_configure --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR) -- $(MOOS_TOOLSUI_CMAKE_EXTRA_FLAGS)
 
 override_dh_auto_build:
 	dh_auto_build --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR)
 	dh_auto_build --sourcedirectory=$(MOOS_GEODESY_SRC_DIR) --builddirectory=$(MOOS_GEODESY_BUILD_DIR)
 	dh_auto_build --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR)
+	dh_auto_build --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR)
+	dh_auto_build --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
 
 override_dh_auto_install:
 	dh_auto_install --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR)
 	dh_auto_install --sourcedirectory=$(MOOS_GEODESY_SRC_DIR) --builddirectory=$(MOOS_GEODESY_BUILD_DIR)
 	dh_auto_install --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR)
+	dh_auto_install --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR)
+	dh_auto_install --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
 
 override_dh_auto_clean:
 	dh_auto_clean --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR)
 	dh_auto_clean --sourcedirectory=$(MOOS_GEODESY_SRC_DIR) --builddirectory=$(MOOS_GEODESY_BUILD_DIR)
 	dh_auto_clean --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR)
+	dh_auto_clean --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR)
+	dh_auto_clean --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
 
 export DEB_BUILD_PARALLEL = true
