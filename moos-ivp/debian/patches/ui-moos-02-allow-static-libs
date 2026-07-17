@@ -1,0 +1,14 @@
+Index: moos-ivp-24.8.1+dfsg/MOOS_Jul0519/MOOSToolsUI/CMakeLists.txt
+===================================================================
+--- moos-ivp-24.8.1+dfsg.orig/MOOS_Jul0519/MOOSToolsUI/CMakeLists.txt
++++ moos-ivp-24.8.1+dfsg/MOOS_Jul0519/MOOSToolsUI/CMakeLists.txt
+@@ -38,9 +38,6 @@ include(EnableAllWarnings)
+ # Bring in helper functions for dealing with CACHE INTERNAL variables
+ include(CacheInternalHelpers)
+ 
+-# We want to create dynamic libraries
+-set(BUILD_SHARED_LIBS true)
+-
+ # Enable Doxygen build with 'make doxygen'
+ option(ENABLE_DOXYGEN "Enable a 'make doc' target for Doxygen documentation")
+ if (ENABLE_DOXYGEN)

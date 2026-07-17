@@ -3,3 +3,4 @@ core-moos-02-multiarch-lib-install
 core-moos-03-rename-tool-binaries
 ivp-01-rename-tool-binaries
 ui-moos-01-install-all-apps
+ui-moos-02-allow-static-libs
