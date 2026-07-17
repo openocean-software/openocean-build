@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
 MOOS_CORE_SRC_DIR=$(CURDIR)/MOOS/MOOSCore
 MOOS_CORE_BUILD_DIR = $(CURDIR)/build/MOOS/MOOSCore
 MOOS_CORE_CMAKE_EXTRA_FLAGS = -DUSE_ASYNC_COMMS=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5
@@ -50,5 +52,3 @@ override_dh_auto_clean:
 	dh_auto_clean --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR)
 	dh_auto_clean --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR)
 	dh_auto_clean --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
-
-export DEB_BUILD_PARALLEL = true
