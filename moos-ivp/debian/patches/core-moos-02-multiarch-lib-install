@@ -1,0 +1,33 @@
+--- a/MOOS_Jul0519/MOOSCore/Core/libMOOS/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSCore/Core/libMOOS/CMakeLists.txt
+@@ -203,8 +203,8 @@ install(
+ # install libraries
+ install(TARGETS MOOS
+   EXPORT MOOS
+-  LIBRARY DESTINATION lib
+-  ARCHIVE DESTINATION lib
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+ 
+ add_subdirectory(testing)
+--- a/MOOS_Jul0519/MOOSCore/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSCore/CMakeLists.txt
+@@ -180,6 +180,8 @@ if(UNIX OR "${CMAKE_SYSTEM_PROCESSOR}" S
+     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ endif()
+ 
++include(GNUInstallDirs)
++
+ add_subdirectory(Core)
+ 
+ #########################
+@@ -218,7 +220,7 @@ write_basic_package_version_file("${VERS
+ #########################
+ 
+ # Provide a cmake config script for the install directory
+-set(PROJECT_CONFIG_PATH "lib/cmake/MOOS")
++set(PROJECT_CONFIG_PATH "${CMAKE_INSTALL_LIBDIR}/cmake/MOOS")
+ install(
+     EXPORT MOOS
+     NAMESPACE MOOS::

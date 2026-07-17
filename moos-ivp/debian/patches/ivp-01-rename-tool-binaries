@@ -1,0 +1,140 @@
+--- a/ivp/src/app_gen_moos_app/CMakeLists.txt
++++ b/ivp/src/app_gen_moos_app/CMakeLists.txt
+@@ -10,9 +10,9 @@ SET(SRC
+ )
+ 
+ 
+-ADD_EXECUTABLE(gen_moos_app ${SRC})
++ADD_EXECUTABLE(ivp_gen_moos_app ${SRC})
+ 
+-TARGET_LINK_LIBRARIES(gen_moos_app
++TARGET_LINK_LIBRARIES(ivp_gen_moos_app
+   mbutil
+   ${SYSTEM_LIBS}
+ )
+--- a/ivp/src/app_gen_obstacles/CMakeLists.txt
++++ b/ivp/src/app_gen_obstacles/CMakeLists.txt
+@@ -8,9 +8,9 @@ SET(SRC
+   main.cpp
+ )
+ 
+-ADD_EXECUTABLE(gen_obstacles ${SRC})
++ADD_EXECUTABLE(ivp_gen_obstacles ${SRC})
+ 
+-TARGET_LINK_LIBRARIES(gen_obstacles
++TARGET_LINK_LIBRARIES(ivp_gen_obstacles
+   obstacles
+   geometry
+   mbutil
+--- a/ivp/src/app_manifest_test/CMakeLists.txt
++++ b/ivp/src/app_manifest_test/CMakeLists.txt
+@@ -17,9 +17,9 @@ SET(SRC
+   ManifestTester.cpp 
+ )
+  
+-ADD_EXECUTABLE(manifest_test ${SRC})
++ADD_EXECUTABLE(ivp_manifest_test ${SRC})
+      
+-TARGET_LINK_LIBRARIES(manifest_test
++TARGET_LINK_LIBRARIES(ivp_manifest_test
+   manifest
+   apputil
+   mbutil
+--- a/ivp/src/app_mhash_gen/CMakeLists.txt
++++ b/ivp/src/app_mhash_gen/CMakeLists.txt
+@@ -7,9 +7,9 @@ SET(SRC
+   main.cpp
+ )
+ 
+-ADD_EXECUTABLE(mhash_gen ${SRC})
++ADD_EXECUTABLE(ivp_mhash_gen ${SRC})
+ 
+-TARGET_LINK_LIBRARIES(mhash_gen
++TARGET_LINK_LIBRARIES(ivp_mhash_gen
+   mbutil
+   ${SYSTEM_LIBS}
+ )
+--- a/ivp/src/app_nzero/CMakeLists.txt
++++ b/ivp/src/app_nzero/CMakeLists.txt
+@@ -6,9 +6,9 @@
+ FILE(GLOB SRC
+   main.cpp)
+ 
+-ADD_EXECUTABLE(nzero ${SRC})
++ADD_EXECUTABLE(ivp_nzero ${SRC})
+    
+-TARGET_LINK_LIBRARIES(nzero
++TARGET_LINK_LIBRARIES(ivp_nzero
+   geometry
+   mbutil
+   m)
+--- a/ivp/src/app_pickpos/CMakeLists.txt
++++ b/ivp/src/app_pickpos/CMakeLists.txt
+@@ -5,9 +5,9 @@
+ 
+ FILE(GLOB SRC *.cpp)
+ 
+-ADD_EXECUTABLE(pickpos ${SRC})
++ADD_EXECUTABLE(ivp_pickpos ${SRC})
+ 
+-TARGET_LINK_LIBRARIES(pickpos
++TARGET_LINK_LIBRARIES(ivp_pickpos
+   geometry
+   mbutil
+   ${SYSTEM_LIBS}
+--- a/ivp/src/app_projfield/CMakeLists.txt
++++ b/ivp/src/app_projfield/CMakeLists.txt
+@@ -7,9 +7,9 @@ FILE(GLOB SRC
+   main.cpp
+   FldProjector.cpp)
+ 
+-ADD_EXECUTABLE(projfield ${SRC})
++ADD_EXECUTABLE(ivp_projfield ${SRC})
+    
+-TARGET_LINK_LIBRARIES(projfield
++TARGET_LINK_LIBRARIES(ivp_projfield
+   geometry
+   mbutil
+   m)
+--- a/ivp/src/app_projpt/CMakeLists.txt
++++ b/ivp/src/app_projpt/CMakeLists.txt
+@@ -6,9 +6,9 @@
+ FILE(GLOB SRC
+   main.cpp)
+ 
+-ADD_EXECUTABLE(projpt ${SRC})
++ADD_EXECUTABLE(ivp_projpt ${SRC})
+    
+-TARGET_LINK_LIBRARIES(projpt
++TARGET_LINK_LIBRARIES(ivp_projpt
+   geometry
+   mbutil
+   m)
+--- a/ivp/src/app_tagrep/CMakeLists.txt
++++ b/ivp/src/app_tagrep/CMakeLists.txt
+@@ -8,9 +8,9 @@ SET(SYSTEM_LIBS m)
+ 
+ SET(SRC main.cpp TagHandler.cpp)
+ 
+-ADD_EXECUTABLE(tagrep ${SRC})
++ADD_EXECUTABLE(ivp_tagrep ${SRC})
+    
+-TARGET_LINK_LIBRARIES(tagrep
++TARGET_LINK_LIBRARIES(ivp_tagrep
+   mbutil
+   ${SYSTEM_LIBS})
+ 
+--- a/ivp/src/app_bweb/CMakeLists.txt
++++ b/ivp/src/app_bweb/CMakeLists.txt
+@@ -10,9 +10,9 @@ SET(SRC
+   BHV_Guide.cpp
+   BHV_Guide_Info.cpp)
+ 
+-ADD_EXECUTABLE(bweb ${SRC})
++ADD_EXECUTABLE(ivp_bweb ${SRC})
+ 
+-TARGET_LINK_LIBRARIES(bweb
++TARGET_LINK_LIBRARIES(ivp_bweb
+   ${MOOS_LIBRARIES}
+   mbutil
+   ${SYSTEM_LIBS})

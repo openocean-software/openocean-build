@@ -10,9 +10,63 @@ Build-Depends: debhelper-compat (= 13),
                libtiff-dev,
                libfltk1.3-dev,
                libproj-dev
-Standards-Version: 3.9.7
+Standards-Version: 4.7.0
 Section: science
 Homepage: http://moos-ivp.org
+Vcs-Git: https://github.com/moos-ivp/moos-ivp.git
+Vcs-Browser: https://github.com/moos-ivp/moos-ivp
+
+Package: libmoos10
+Architecture: any
+Section: libs
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Cross Platform Software for Robotics Research. 
+ From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
+ However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
+ This packages contains the MOOS library (libMOOS) for the redesigned version 10 of MOOS.
+
+Package: libmoos10-dbg
+Architecture: any
+Section: debug
+Multi-Arch: same
+Depends: libmoos10 (=${binary:Version}),
+         ${misc:Depends}
+Description: Cross Platform Software for Robotics Research. 
+ From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
+ However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
+ This packages contains the MOOS library (libMOOS) for the redesigned version 10 of MOOS with the debugging symbols still intact.
+
+
+Package: libmoos10-dev
+Architecture: any
+Provides: libmoos-dev
+Section: libdevel
+Multi-Arch: same
+Depends: libmoos10 (=${binary:Version}),
+         ${misc:Depends}
+Description: Cross Platform Software for Robotics Research. 
+ From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
+ However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
+ This packages contains the MOOS library header files for the redesigned version 10 of MOOS.
+
+Package: moos10-tools
+Architecture: any
+Section: science
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Cross Platform Software for Robotics Research. 
+ From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
+ However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
+ This packages contains the various command line tools included with MOOS.
+
+Package: moosdb10
+Architecture: any
+Section: science
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Cross Platform Software for Robotics Research. 
+ From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
+ However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
+ This packages contains the "MOOSDB" for the redesigned version 10 of MOOS.
 
 Package: libmoos-ivp-dev
 Section: libdevel
@@ -51,5 +105,21 @@ Section: science
 Architecture: any
 Description: The MOOS-IvP multi-objective decision engine (pHelmIvP) and related tools for autonomous marine vehicles, except GUI applications.
  MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space.  The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors. 
- This package provides the applications in MOOS-IvP (e.g. pHelmIvP), except those requiring graphical libraries.
+ This package provides the MOOS applications in MOOS-IvP (e.g. pHelmIvP), except those requiring graphical libraries.
+
+Package: moos-ivp-tools
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Section: science
+Architecture: any
+Description: The MOOS-IvP multi-objective decision engine (pHelmIvP) and related tools for autonomous marine vehicles, except GUI applications.
+ MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space.  The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors. 
+ This package provides the command line utilities provided by MOOS-IvP.
+
+Package: moos-ivp-alog
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Section: science
+Architecture: any
+Description: The MOOS-IvP multi-objective decision engine (pHelmIvP) and related tools for autonomous marine vehicles, except GUI applications.
+ MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space.  The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors. 
+ This package provides the ALOG log processing utilities provided by MOOS-IvP.
 

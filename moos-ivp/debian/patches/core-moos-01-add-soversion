@@ -1,0 +1,10 @@
+--- a/MOOS_Jul0519/MOOSCore/Core/libMOOS/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSCore/Core/libMOOS/CMakeLists.txt
+@@ -146,6 +146,7 @@ if(UNIX)
+         PUBLIC "${THREAD_LIB}"
+         PRIVATE m
+     )
++    set_target_properties(MOOS PROPERTIES VERSION "${PACKAGE_VERSION}" SOVERSION "${PACKAGE_VERSION}")
+ elseif(WIN32)
+     target_link_libraries(MOOS PRIVATE
+         wsock32

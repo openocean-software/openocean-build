@@ -1,5 +1,4 @@
-01-geodesy-build
-02-fpic
-03-hypot-header
-04-m-deprecated-alt
-05-comms-policy
+core-moos-01-add-soversion
+core-moos-02-multiarch-lib-install
+core-moos-03-rename-tool-binaries
+ivp-01-rename-tool-binaries

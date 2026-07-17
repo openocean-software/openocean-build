@@ -1,0 +1,3 @@
+usr/include/*
+usr/lib/*/libMOOS*.so
+usr/lib/*/cmake/*
