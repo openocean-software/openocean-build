@@ -76,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GPG_PRIVATE_KEY}" ]; then
-            echo "No GPG_PRIVATE_KEY secret configured on the 'release' Environment -- building unsigned packages."
+            echo "No GPG_PRIVATE_KEY secret configured -- building unsigned packages."
             echo "sign_key=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -96,17 +96,22 @@ jobs:
           if [ -n "${GPG_PASSPHRASE:-}" ]; then
             # Cache the passphrase in gpg-agent so "debsign" (invoked
             # non-interactively by "make debian-sbuild" below) can unlock
-            # the key without a terminal/pinentry prompt.
+            # the key without a terminal/pinentry prompt. A key can have
+            # multiple keygrips (primary + subkeys), and debsign may use
+            # any of them to sign, so preset the passphrase for all of
+            # this key's keygrips, not just the first.
             echo "allow-preset-passphrase" > "${GNUPGHOME}/gpg-agent.conf"
             gpgconf --kill gpg-agent || true
             gpgconf --launch gpg-agent
-            keygrip=$(gpg --list-secret-keys --with-keygrip --with-colons | awk -F: '$1 == "grp" { print $10; exit }')
-            if [ -z "${keygrip}" ]; then
-              echo "::error::Could not determine the keygrip for the imported key -- unable to cache GPG_PASSPHRASE."
+            keygrips=$(gpg --list-secret-keys --with-keygrip --with-colons "${key_id}" | awk -F: '$1 == "grp" { print $10 }')
+            if [ -z "${keygrips}" ]; then
+              echo "::error::Could not determine the keygrip(s) for the imported key -- unable to cache GPG_PASSPHRASE."
               exit 1
             fi
             libexec_dir=$(gpgconf --list-dirs libexecdir)
-            "${libexec_dir}/gpg-preset-passphrase" --preset "${keygrip}" <<< "${GPG_PASSPHRASE}"
+            while IFS= read -r keygrip; do
+              "${libexec_dir}/gpg-preset-passphrase" --preset "${keygrip}" <<< "${GPG_PASSPHRASE}"
+            done <<< "${keygrips}"
           fi
 
       - name: Build packages (sbuild)
