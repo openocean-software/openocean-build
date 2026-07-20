@@ -134,7 +134,6 @@ jobs:
           done
 
           while IFS= read -r repo; do
-            [ -n "${repo}" ] || continue
             dist=${repo_dist["${repo}"]}
             endpoint=${repo_endpoint["${repo}"]}
             # Each run starts from a fresh runner with an empty local aptly
