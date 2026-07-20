@@ -60,7 +60,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}
-          path: build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*
+          # Upload all but omit *.build log which has unsupported characters
+          path: |
+            build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*
+            !build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*.build
           if-no-files-found: error
 
   publish:
