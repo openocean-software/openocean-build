@@ -120,6 +120,7 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 		-v $(DEBIAN_SBUILD_OUTPUT_DIR):/output \
 		-w /output \
 		$(DEBIAN_SBUILD_DOCKER_IMAGE) \
+		--verbose \
 		--chroot=$(DEBIAN_SBUILD_CHROOT) \
 		--dist=$(DIST) \
 		--arch=$(ARCH) \
