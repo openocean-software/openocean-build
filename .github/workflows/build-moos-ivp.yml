@@ -15,6 +15,9 @@ on:
       - moos-ivp/debian/changelog
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 env:
   OOS_PACKAGE: moos-ivp
 
@@ -77,8 +80,10 @@ jobs:
 
       - name: Install aptly
         run: |
-          curl -fsSL https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /usr/share/keyrings/aptly-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/aptly-archive-keyring.gpg] http://repo.aptly.info/ squeeze main" \
+          sudo install -d /etc/apt/keyrings
+          curl -fsSL https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/aptly.gpg
+          codename=$(lsb_release -cs)
+          echo "deb [signed-by=/etc/apt/keyrings/aptly.gpg] http://repo.aptly.info/release ${codename} main" \
             | sudo tee /etc/apt/sources.list.d/aptly.list
           sudo apt-get update
           sudo apt-get install -y aptly
@@ -100,6 +105,10 @@ jobs:
             }
           }
           CONF
+          # NOTE: signing is disabled because no GPG signing key is provisioned
+          # yet. Once a signing key is added as a secret, import it here and
+          # drop gpgDisableSign/-skip-signing below so published repos are
+          # trusted by apt without [trusted=yes].
 
       - name: Create/update repos and publish to S3
         run: |
@@ -111,14 +120,24 @@ jobs:
             distro=${distro_dist%%-*}
             dist=${distro_dist#*-}
             repo="${OOS_PACKAGE}-${distro}-${dist}"
+            endpoint="s3:openocean-build:${distro}"
 
-            echo "::group::Publishing ${repo} (distribution=${dist}) to s3:openocean-build:${distro}"
+            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             aptly repo create -distribution="${dist}" -component=main "${repo}"
             aptly repo add "${repo}" "${artifact_dir}"
+
+            # Each run starts from a fresh runner with an empty local aptly
+            # database, so it never has a record of a previous publish --
+            # "publish repo" (first publish) is always the right call here,
+            # not "publish update" (which needs a prior local snapshot).
+            # -force-overwrite lets it overwrite pool files already present
+            # in the bucket from earlier runs (e.g. a re-triggered workflow)
+            # without failing on checksum mismatches for identical content.
             aptly publish repo \
+              -force-overwrite \
               -skip-signing \
               -distribution="${dist}" \
               "${repo}" \
-              "s3:openocean-build:${distro}"
+              "${endpoint}"
             echo "::endgroup::"
           done
