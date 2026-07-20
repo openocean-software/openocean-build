@@ -113,6 +113,11 @@ debian-docker-image: $(DEBIAN_DOCKER_DIR)/Dockerfile
 # Full build via sbuild in a schroot chroot -- slower (bootstraps a
 # minimal chroot, resolves deps with dose3) but closer to how a real
 # archive/buildd would build the package.
+#
+# --chroot-mode=schroot is required, not just the default: newer sbuild
+# (e.g. Ubuntu 26.04's) defaults CHROOT_MODE to "unshare" instead, which
+# needs real unprivileged user-namespace support that Docker --privileged
+# doesn't grant to a non-root process -- see docker/debian/sbuild/Dockerfile.
 debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 	mkdir -p $(DEBIAN_SBUILD_OUTPUT_DIR)
 	docker run --rm --privileged \
@@ -121,6 +126,7 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 		-w /output \
 		$(DEBIAN_SBUILD_DOCKER_IMAGE) \
 		--verbose \
+		--chroot-mode=schroot \
 		--chroot=$(DEBIAN_SBUILD_CHROOT) \
 		--dist=$(DIST) \
 		--arch=$(ARCH) \

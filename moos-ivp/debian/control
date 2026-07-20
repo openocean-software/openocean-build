@@ -9,6 +9,7 @@ Build-Depends: debhelper-compat (= 13),
                libxft-dev,
                libtiff-dev,
                libfltk1.3-dev,
+               fluid,
                libproj-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
@@ -90,6 +91,7 @@ Depends: libmoos-ivp (= ${binary:Version}),
          libxft-dev,
          libtiff-dev,
          libfltk1.3-dev,
+         fluid,
          libproj-dev,
          ${misc:Depends}
 Description: Developers' package for the libraries included with the MOOS-IvP multi-objective decision engine (and related tools) for autonomous marine vehicles.

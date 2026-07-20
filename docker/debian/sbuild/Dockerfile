@@ -36,13 +36,22 @@ RUN apt-get update && \
 #
 # Ubuntu splits build-essential packages across main and universe (Debian
 # keeps them all in main), so universe is added for that case.
+#
+# --include=apt,passwd: the "buildd" variant's essential+build-essential
+# set doesn't reliably pull these in -- e.g. jammy's bootstrap lacks apt,
+# and resolute's lacks passwd (so schroot can't run useradd to create its
+# "sbuild" user in the chroot at session-start) -- even though other
+# releases happen to include them. sbuild needs both regardless of distro
+# (apt to install build-deps, passwd for schroot's session setup), so
+# request them explicitly rather than relying on variant/suite-dependent
+# luck.
 RUN case "${DISTRO}" in \
         debian) MIRROR=http://deb.debian.org/debian; COMPONENTS=main ;; \
         ubuntu) MIRROR=http://archive.ubuntu.com/ubuntu; COMPONENTS=main,universe ;; \
         *) echo "Unsupported DISTRO '${DISTRO}'" >&2; exit 1 ;; \
     esac; \
     mkdir -p /srv/chroot/${DIST}-${ARCH} && \
-    mmdebstrap --arch=${ARCH} --variant=buildd --components="${COMPONENTS}" "${DIST}" \
+    mmdebstrap --arch=${ARCH} --variant=buildd --include=apt,passwd --components="${COMPONENTS}" "${DIST}" \
         /srv/chroot/${DIST}-${ARCH} \
         "${MIRROR}"
 
@@ -68,6 +77,17 @@ RUN existing_user="$(getent passwd "${UID}" | cut -d: -f1)"; \
     useradd -m -s /bin/bash -u "${UID}" -g "${GID}" builder && \
     groupadd -f sbuild && \
     usermod -aG sbuild builder
+
+# /etc/schroot/sbuild/fstab (shipped by the sbuild package) bind-mounts
+# /var/lib/sbuild/build onto /build inside the chroot session. Older sbuild
+# packages (e.g. bookworm/noble) create this -- owned by a dedicated
+# "sbuild" system user/group -- in their postinst; Ubuntu 26.04's newer
+# sbuild, built around the "unshare" backend, no longer creates either, so
+# the schroot-mode session setup fails with "special device ... does not
+# exist" unless we create the directory ourselves. It doesn't need the
+# "sbuild" user specifically: schroot's setuid-root helper does the
+# mount()/chroot() work regardless of this directory's static ownership.
+RUN mkdir -p -m 777 /var/lib/sbuild/build /var/lib/sbuild/apt-keys
 
 USER builder
 WORKDIR /build

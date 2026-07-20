@@ -31,17 +31,17 @@ jobs:
       matrix:
         include:
           # Debian: "oldstable"/"stable"
-#          - distro: debian
-#            dist: bookworm
+          - distro: debian
+            dist: bookworm
           - distro: debian
             dist: trixie
           # Ubuntu: currently supported LTS series.
-#          - distro: ubuntu
-#            dist: jammy
+          - distro: ubuntu
+            dist: jammy
           - distro: ubuntu
             dist: noble
-#          - distro: ubuntu
-#            dist: resolute
+          - distro: ubuntu
+            dist: resolute
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
