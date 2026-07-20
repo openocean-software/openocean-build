@@ -106,6 +106,7 @@ jobs:
       - name: Create/update repos and publish to S3
         run: |
           set -euo pipefail
+          declare -A repo_dist repo_endpoint
           for artifact_dir in artifacts/${OOS_PACKAGE}-*; do
             [ -d "${artifact_dir}" ] || continue
             name=$(basename "${artifact_dir}")
@@ -128,7 +129,13 @@ jobs:
               aptly repo create -distribution="${dist}" -component=main "${repo}"
             fi
             aptly repo add "${repo}" "${artifact_dir}"
+            repo_dist["${repo}"]="${dist}"
+            repo_endpoint["${repo}"]="${endpoint}"
+          done
 
+          for repo in "${!repo_dist[@]}"; do
+            dist=${repo_dist["${repo}"]}
+            endpoint=${repo_endpoint["${repo}"]}
             # Each run starts from a fresh runner with an empty local aptly
             # database, so it never has a record of a previous publish --
             # "publish repo" (first publish) is always the right call here,
@@ -136,6 +143,7 @@ jobs:
             # -force-overwrite lets it overwrite pool files already present
             # in the bucket from earlier runs (e.g. a re-triggered workflow)
             # without failing on checksum mismatches for identical content.
+            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             aptly publish repo \
               -force-overwrite \
               -skip-signing \
