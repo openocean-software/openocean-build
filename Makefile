@@ -1,5 +1,6 @@
 # Builds the Debian packages locally in Docker. Intended for
-# local testing only -- resulting packages are left unsigned (-uc -us).
+# local testing only -- resulting packages are left unsigned (-uc -us)
+# unless SIGN_KEY is set (see below).
 #
 # All commands require OOS_PACKAGE to be set, e.g. "export OOS_PACKAGE=moos-ivp"
 #
@@ -14,6 +15,13 @@
 #   make debian DISTRO=ubuntu DIST=jammy # override the Ubuntu codename
 #   make sbuild ARCH=arm64               # cross-arch (needs
 #                                        # qemu-user-static on the host)
+#   make debian-sbuild SIGN_KEY=ABCD1234 # sign the resulting .dsc/.changes
+#                                        # with this GPG key id (must be
+#                                        # present, and unlocked/usable
+#                                        # non-interactively, in the
+#                                        # invoking user's keyring -- see
+#                                        # build-moos-ivp.yml for how CI
+#                                        # provisions one)
 #   make clean                           # remove fetched source / build
 #                                        # products
 #   make distclean                       # clean + remove the Docker images
@@ -44,6 +52,14 @@ DEB_VERSION   := $(shell dpkg-parsechangelog -l $(OOS_PACKAGE)/debian/changelog 
 UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | sed -E 's/-[^-]+$$//')
 
 ARCH          := amd64
+
+# Optional: GPG key id (fingerprint, long/short id, or email) to sign the
+# "debian-sbuild" output (.dsc/.changes) with via debsign. The key must
+# already be imported and usable non-interactively (e.g. cached in
+# gpg-agent, or passphrase-less) by the invoking user -- debsign is run
+# directly on the host, not inside the sbuild container. Leave unset
+# (the default) to skip signing entirely, e.g. for local testing.
+SIGN_KEY      ?=
 
 # Passed into the sbuild image so its "builder" user's ids match the
 # invoking host user -- see docker/debian/sbuild/Dockerfile.
@@ -135,6 +151,12 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 		--debbuildopt=-uc --debbuildopt=-us \
 		/build/$(notdir $(DSC_FILE))
 	@echo "Packages built in $(DEBIAN_SBUILD_OUTPUT_DIR)"
+ifneq ($(SIGN_KEY),)
+	@echo "Signing packages in $(DEBIAN_SBUILD_OUTPUT_DIR) with key $(SIGN_KEY)"
+	debsign -k$(SIGN_KEY) $(DEBIAN_SBUILD_OUTPUT_DIR)/*.changes
+else
+	@echo "SIGN_KEY not set -- leaving packages unsigned (see Makefile header for how to enable signing)"
+endif
 
 # Rebuilds are cheap: docker build no-ops on cache hits once the chroot
 # tarball layer exists, so this is safe to run as a prerequisite every time.
