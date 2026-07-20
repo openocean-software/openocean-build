@@ -96,7 +96,8 @@ jobs:
               "openocean-build": {
                 "region": "us-east-1",
                 "bucket": "openocean-build",
-                "acl": "public-read"
+                "acl": "",
+                "prefix": "apt/"
               }
             }
           }
@@ -116,7 +117,7 @@ jobs:
             distro=${distro_dist%%-*}
             dist=${distro_dist#*-}
             repo="${OOS_PACKAGE}-${distro}-${dist}"
-            endpoint="s3:openocean-build:${distro}"
+            endpoint="s3:openocean-build:${distro}-${dist}"
 
             echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             # Guard "repo create" so re-running this step (e.g. a re-run of a
