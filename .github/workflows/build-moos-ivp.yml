@@ -106,7 +106,8 @@ jobs:
       - name: Create/update repos and publish to S3
         run: |
           set -euo pipefail
-          declare -A repo_dist repo_endpoint
+          publish_repos=$(mktemp)
+          trap 'rm -f "${publish_repos}"' EXIT
           for artifact_dir in artifacts/${OOS_PACKAGE}-*; do
             [ -d "${artifact_dir}" ] || continue
             name=$(basename "${artifact_dir}")
@@ -121,7 +122,6 @@ jobs:
             repo="${OOS_PACKAGE}-${distro}-${dist}"
             endpoint="s3:openocean-build:${distro}-${dist}"
 
-            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             # Guard "repo create" so re-running this step (e.g. a re-run of a
             # failed job against the same local aptly database) doesn't abort
             # the loop just because the local repo was already created.
@@ -129,13 +129,10 @@ jobs:
               aptly repo create -distribution="${dist}" -component=main "${repo}"
             fi
             aptly repo add "${repo}" "${artifact_dir}"
-            repo_dist["${repo}"]="${dist}"
-            repo_endpoint["${repo}"]="${endpoint}"
+            printf '%s\t%s\t%s\n' "${repo}" "${dist}" "${endpoint}" >> "${publish_repos}"
           done
 
-          while IFS= read -r repo; do
-            dist=${repo_dist["${repo}"]}
-            endpoint=${repo_endpoint["${repo}"]}
+          sort -u "${publish_repos}" | while IFS=$'\t' read -r repo dist endpoint; do
             # Each run starts from a fresh runner with an empty local aptly
             # database, so it never has a record of a previous publish --
             # "publish repo" (first publish) is always the right call here,
@@ -151,4 +148,4 @@ jobs:
               "${repo}" \
               "${endpoint}"
             echo "::endgroup::"
-          done < <(printf '%s\n' "${!repo_dist[@]}" | sort)
+          done
