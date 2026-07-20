@@ -132,7 +132,7 @@ jobs:
             printf '%s\t%s\t%s\n' "${repo}" "${dist}" "${endpoint}" >> "${publish_repos}"
           done
 
-          sort -u "${publish_repos}" | while IFS=$'\t' read -r repo dist endpoint; do
+          while IFS=$'\t' read -r repo dist endpoint; do
             # Each run starts from a fresh runner with an empty local aptly
             # database, so it never has a record of a previous publish --
             # "publish repo" (first publish) is always the right call here,
@@ -148,4 +148,4 @@ jobs:
               "${repo}" \
               "${endpoint}"
             echo "::endgroup::"
-          done
+          done < <(sort -u "${publish_repos}")
