@@ -123,7 +123,12 @@ jobs:
             endpoint="s3:openocean-build:${distro}"
 
             echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
-            aptly repo create -distribution="${dist}" -component=main "${repo}"
+            # Guard "repo create" so re-running this step (e.g. a re-run of a
+            # failed job against the same local aptly database) doesn't abort
+            # the loop just because the local repo was already created.
+            if ! aptly repo show "${repo}" >/dev/null 2>&1; then
+              aptly repo create -distribution="${dist}" -component=main "${repo}"
+            fi
             aptly repo add "${repo}" "${artifact_dir}"
 
             # Each run starts from a fresh runner with an empty local aptly
