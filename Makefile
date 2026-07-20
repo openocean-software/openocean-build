@@ -3,25 +3,51 @@
 #
 # All commands require OOS_PACKAGE to be set, e.g. "export OOS_PACKAGE=moos-ivp"
 #
-#   make debian             # quick build: throwaway container, deps via
-#                           # mk-build-deps; drops to a shell on failure
-#   make debian-sbuild             # full build: sbuild in a schroot chroot
-#                           # (closer to a real archive/buildd build)
-#   make sbuild ARCH=arm64  # cross-arch (needs qemu-user-static on the host)
-#   make clean              # remove fetched source / build products
-#   make distclean          # clean + remove the Docker images
+#   make debian                          # quick build: throwaway container,
+#                                        # deps via mk-build-deps; drops to a
+#                                        # shell on failure
+#   make debian-sbuild                   # full build: sbuild in a schroot
+#                                        # chroot (closer to a real
+#                                        # archive/buildd build)
+#   make debian DISTRO=ubuntu            # same, but against Ubuntu instead
+#                                        # of Debian (default codename below)
+#   make debian DISTRO=ubuntu DIST=jammy # override the Ubuntu codename
+#   make sbuild ARCH=arm64               # cross-arch (needs
+#                                        # qemu-user-static on the host)
+#   make clean                           # remove fetched source / build
+#                                        # products
+#   make distclean                       # clean + remove the Docker images
 #
-# Output .deb, etc. land in build/<package>/debs.
+# Output .deb, etc. land in build/<package>/debs/<distro>-<dist>.
 
 ifndef OOS_PACKAGE
 $(error OOS_PACKAGE is not set. Please run: export OOS_PACKAGE=<package name>)
 endif
 
+# DISTRO selects the .deb-based distribution family to build against; it is
+# also the Docker Hub repository the base image is pulled from (debian/ubuntu).
+DISTRO        ?= debian
+
+ifeq ($(DISTRO),debian)
+# Debian has a single rolling target, so take it from debian/changelog.
 DIST          := $(shell dpkg-parsechangelog -l $(OOS_PACKAGE)/debian/changelog -S Distribution)
+else ifeq ($(DISTRO),ubuntu)
+# Ubuntu has no equivalent field (the changelog's Distribution is always a
+# Debian codename), so default to the current LTS and let it be overridden.
+DIST          ?= resolute
+else
+$(error Unsupported DISTRO '$(DISTRO)'. Supported values: debian, ubuntu)
+endif
+
 DEB_VERSION   := $(shell dpkg-parsechangelog -l $(OOS_PACKAGE)/debian/changelog -S Version)
 UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | sed -E 's/-[^-]+$$//')
 
 ARCH          := amd64
+
+# Passed into the sbuild image so its "builder" user's ids match the
+# invoking host user -- see docker/debian/sbuild/Dockerfile.
+UID           := $(shell id -u)
+GID           := $(shell id -g)
 
 BUILD_DIR     := $(CURDIR)/build/$(OOS_PACKAGE)
 
@@ -29,15 +55,15 @@ SRC_DIR       := $(BUILD_DIR)/$(OOS_PACKAGE)-$(UPSTREAM_VERSION)
 ORIG_TARBALL  := $(BUILD_DIR)/$(OOS_PACKAGE)_$(UPSTREAM_VERSION).orig.tar.gz
 DSC_FILE      := $(BUILD_DIR)/$(OOS_PACKAGE)_$(DEB_VERSION).dsc
 
-DEBIAN_SBUILD_DOCKER_IMAGE := $(OOS_PACKAGE)-debian-sbuild:$(DIST)
+DEBIAN_SBUILD_DOCKER_IMAGE := $(OOS_PACKAGE)-sbuild:$(DISTRO)-$(DIST)
 DEBIAN_SBUILD_DOCKER_DIR   := docker/debian/sbuild
 DEBIAN_SBUILD_CHROOT       := $(DIST)-$(ARCH)-sbuild
 
-DEBIAN_DOCKER_IMAGE := $(OOS_PACKAGE)-debian-simple:$(DIST)
+DEBIAN_DOCKER_IMAGE := $(OOS_PACKAGE)-simple:$(DISTRO)-$(DIST)
 DEBIAN_DOCKER_DIR   := docker/debian/simple
-DEBIAN_BUILD_DIR    := $(BUILD_DIR)/debian-simple
+DEBIAN_BUILD_DIR    := $(BUILD_DIR)/$(DISTRO)-$(DIST)-simple
 DEBIAN_SRC_DIR      := $(DEBIAN_BUILD_DIR)/$(OOS_PACKAGE)-$(UPSTREAM_VERSION)
-DEBIAN_OUTPUT_DIR   := $(BUILD_DIR)/debs
+DEBIAN_OUTPUT_DIR   := $(BUILD_DIR)/debs/$(DISTRO)-$(DIST)
 
 .PHONY: debian debian-docker-image debian-sbuild debian-sbuild-docker-image source clean distclean
 
@@ -53,7 +79,7 @@ debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(SRC_DIR)/debian
 	cp -a $(OOS_PACKAGE)/debian $(SRC_DIR)/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
-	docker run --rm -it \
+	docker run --rm -i \
 		-v $(DEBIAN_BUILD_DIR):/build \
 		-w /build/$(notdir $(DEBIAN_SRC_DIR)) \
 		$(DEBIAN_DOCKER_IMAGE) \
@@ -61,7 +87,7 @@ debian: debian-docker-image $(SRC_DIR)
 			set -x; \
 			apt-get -y update; \
 			mk-build-deps -i -r -t "apt-get -y -o Debug::pkgProblemResolver=yes --no-install-recommends" debian/control && \
-			dpkg-buildpackage -us -uc -b; \
+			su builder -c "set -x; dpkg-buildpackage -us -uc -b"; \
 			status=$$?; \
 			set +x; \
 			if [ $$status -ne 0 ]; then \
@@ -70,12 +96,15 @@ debian: debian-docker-image $(SRC_DIR)
 				echo; \
 				bash; \
 			fi; \
+			chown -R $(UID):$(GID) /build; \
 			exit $$status'
 	mv $(DEBIAN_BUILD_DIR)/*.deb $(DEBIAN_BUILD_DIR)/*.changes $(DEBIAN_BUILD_DIR)/*.buildinfo $(DEBIAN_OUTPUT_DIR)/ 2>/dev/null || true
 	@echo "Packages built in $(DEBIAN_OUTPUT_DIR)"
 
 debian-docker-image: $(DEBIAN_DOCKER_DIR)/Dockerfile
-	docker build --build-arg DIST=$(DIST) -t $(DEBIAN_DOCKER_IMAGE) $(DEBIAN_DOCKER_DIR)
+	docker build --build-arg DISTRO=$(DISTRO) --build-arg DIST=$(DIST) \
+		--build-arg UID=$(UID) --build-arg GID=$(GID) \
+		-t $(DEBIAN_DOCKER_IMAGE) $(DEBIAN_DOCKER_DIR)
 
 # Full build via sbuild in a schroot chroot -- slower (bootstraps a
 # minimal chroot, resolves deps with dose3) but closer to how a real
@@ -99,7 +128,8 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 # Rebuilds are cheap: docker build no-ops on cache hits once the chroot
 # tarball layer exists, so this is safe to run as a prerequisite every time.
 debian-sbuild-docker-image: $(DEBIAN_SBUILD_DOCKER_DIR)/Dockerfile
-	docker build --build-arg DIST=$(DIST) --build-arg ARCH=$(ARCH) \
+	docker build --build-arg DISTRO=$(DISTRO) --build-arg DIST=$(DIST) --build-arg ARCH=$(ARCH) \
+		--build-arg UID=$(UID) --build-arg GID=$(GID) \
 		-t $(DEBIAN_SBUILD_DOCKER_IMAGE) $(DEBIAN_SBUILD_DOCKER_DIR)
 
 # Fetches the upstream release matching debian/watch and repacks it as the
