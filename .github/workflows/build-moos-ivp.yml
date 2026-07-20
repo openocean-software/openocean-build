@@ -60,8 +60,8 @@ jobs:
           name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}
           # Upload all but omit *.build log which has unsupported characters
           path: |
-            build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*
-            !build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*.build
+            build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*
+            !build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*.build
           if-no-files-found: error
 
   publish:
