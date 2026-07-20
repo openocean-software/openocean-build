@@ -1,0 +1,148 @@
+# Builds the moos-ivp Debian/Ubuntu packages and publishes them to the
+# "openocean-build" S3 bucket (us-east-1) via aptly.
+#
+# Triggered whenever moos-ivp/debian/changelog changes (i.e. a new release
+# is cut), but gated behind manual approval: both jobs target the "release"
+# GitHub Environment, which must be configured (Settings -> Environments)
+# with a required reviewer so the workflow pauses for human sign-off before
+# any build or publish step runs. That environment must also define the
+# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets aptly uses to talk to S3.
+name: Build and publish moos-ivp packages
+
+on:
+  push:
+    paths:
+      - moos-ivp/debian/changelog
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  OOS_PACKAGE: moos-ivp
+
+jobs:
+  build:
+    name: Build (${{ matrix.distro }}/${{ matrix.dist }})
+    runs-on: ubuntu-latest
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Debian: use the floating "oldstable"/"stable" suite names (both
+          # a valid Docker Hub tag and a valid mmdebstrap/debootstrap suite
+          # alias) so the matrix doesn't need updating as Debian releases.
+          - distro: debian
+            dist: oldstable
+          - distro: debian
+            dist: stable
+          # Ubuntu: currently supported LTS series.
+          - distro: ubuntu
+            dist: jammy
+          - distro: ubuntu
+            dist: noble
+          - distro: ubuntu
+            dist: resolute
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts dpkg-dev
+
+      - name: Build packages (sbuild)
+        run: make debian-sbuild DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }}
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}
+          path: build/${{ env.OOS_PACKAGE }}/debs/${{ matrix.distro }}-${{ matrix.dist }}/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish to S3 (aptly)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Install aptly
+        run: |
+          sudo install -d /etc/apt/keyrings
+          curl -fsSL https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/aptly.gpg
+          codename=$(lsb_release -cs)
+          echo "deb [signed-by=/etc/apt/keyrings/aptly.gpg] http://repo.aptly.info/release ${codename} main" \
+            | sudo tee /etc/apt/sources.list.d/aptly.list
+          sudo apt-get update
+          sudo apt-get install -y aptly
+
+      - name: Configure aptly for S3 publishing
+        run: |
+          mkdir -p "${HOME}/.aptly"
+          cat > "${HOME}/.aptly.conf" <<CONF
+          {
+            "rootDir": "${HOME}/.aptly",
+            "gpgDisableSign": true,
+            "gpgDisableVerify": true,
+            "S3PublishEndpoints": {
+              "openocean-build": {
+                "region": "us-east-1",
+                "bucket": "openocean-build",
+                "acl": "public-read"
+              }
+            }
+          }
+          CONF
+          # NOTE: signing is disabled because no GPG signing key is provisioned
+          # yet. Once a signing key is added as a secret, import it here and
+          # drop gpgDisableSign/-skip-signing below so published repos are
+          # trusted by apt without [trusted=yes].
+
+      - name: Create/update repos and publish to S3
+        run: |
+          set -euo pipefail
+          for artifact_dir in artifacts/${OOS_PACKAGE}-*; do
+            [ -d "${artifact_dir}" ] || continue
+            name=$(basename "${artifact_dir}")
+            distro_dist=${name#"${OOS_PACKAGE}"-}
+            distro=${distro_dist%%-*}
+            dist=${distro_dist#*-}
+            repo="${OOS_PACKAGE}-${distro}-${dist}"
+            endpoint="s3:openocean-build:${distro}"
+
+            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
+            # Guard "repo create" so re-running this step (e.g. a re-run of a
+            # failed job against the same local aptly database) doesn't abort
+            # the loop just because the local repo was already created.
+            if ! aptly repo show "${repo}" >/dev/null 2>&1; then
+              aptly repo create -distribution="${dist}" -component=main "${repo}"
+            fi
+            aptly repo add "${repo}" "${artifact_dir}"
+
+            # Each run starts from a fresh runner with an empty local aptly
+            # database, so it never has a record of a previous publish --
+            # "publish repo" (first publish) is always the right call here,
+            # not "publish update" (which needs a prior local snapshot).
+            # -force-overwrite lets it overwrite pool files already present
+            # in the bucket from earlier runs (e.g. a re-triggered workflow)
+            # without failing on checksum mismatches for identical content.
+            aptly publish repo \
+              -force-overwrite \
+              -skip-signing \
+              -distribution="${dist}" \
+              "${repo}" \
+              "${endpoint}"
+            echo "::endgroup::"
+          done
