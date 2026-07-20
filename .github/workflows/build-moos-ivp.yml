@@ -8,19 +8,18 @@
 # any build or publish step runs. That environment must also define the
 # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets aptly uses to talk to S3.
 #
-# Signing the built packages (.dsc/.changes) is optional and controlled by
+# Signing the built packages (.dsc/.changes) is required and provisioned via
 # the "release" Environment's secrets (Settings -> Environments -> release
 # -> Environment secrets):
-#   - GPG_PRIVATE_KEY (required to enable signing): an ASCII-armored GPG
-#     private key, e.g. the output of
+#   - GPG_PRIVATE_KEY (required): an ASCII-armored GPG private key, e.g. the
+#     output of
 #       gpg --armor --export-secret-keys YOUR_KEY_ID
-#     Leave this secret unset/undefined to keep building unsigned packages
-#     (the previous/default behavior).
+#     The workflow fails fast if this secret is not configured.
 #   - GPG_PASSPHRASE (optional): the passphrase protecting the above key,
 #     if any. If the key has no passphrase, leave this unset.
-# When GPG_PRIVATE_KEY is set, the "Import GPG signing key" step below
-# imports it and "make debian-sbuild" signs the resulting .dsc/.changes
-# with it (see SIGN_KEY in the Makefile).
+# The "Import GPG signing key" step below imports GPG_PRIVATE_KEY and
+# "make debian-sbuild" signs the resulting .dsc/.changes with it (see
+# SIGN_KEY in the Makefile).
 name: Build and publish moos-ivp packages
 
 on:
@@ -76,9 +75,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GPG_PRIVATE_KEY}" ]; then
-            echo "No GPG_PRIVATE_KEY secret configured -- building unsigned packages."
-            echo "sign_key=" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::GPG_PRIVATE_KEY secret is not configured on the 'release' Environment -- signing is required, see the workflow header for setup instructions."
+            exit 1
           fi
 
           export GNUPGHOME="${RUNNER_TEMP}/gnupg"
