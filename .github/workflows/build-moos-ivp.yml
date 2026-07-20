@@ -30,20 +30,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Debian: use the floating "oldstable"/"stable" suite names (both
-          # a valid Docker Hub tag and a valid mmdebstrap/debootstrap suite
-          # alias) so the matrix doesn't need updating as Debian releases.
+          # Debian: "oldstable"/"stable"
+#          - distro: debian
+#            dist: bookworm
           - distro: debian
-            dist: oldstable
-          - distro: debian
-            dist: stable
+            dist: trixie
           # Ubuntu: currently supported LTS series.
-          - distro: ubuntu
-            dist: jammy
+#          - distro: ubuntu
+#            dist: jammy
           - distro: ubuntu
             dist: noble
-          - distro: ubuntu
-            dist: resolute
+#          - distro: ubuntu
+#            dist: resolute
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -83,11 +81,6 @@ jobs:
 
       - name: Install aptly
         run: |
-          sudo install -d /etc/apt/keyrings
-          curl -fsSL https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/aptly.gpg
-          codename=$(lsb_release -cs)
-          echo "deb [signed-by=/etc/apt/keyrings/aptly.gpg] http://repo.aptly.info/release ${codename} main" \
-            | sudo tee /etc/apt/sources.list.d/aptly.list
           sudo apt-get update
           sudo apt-get install -y aptly
 
