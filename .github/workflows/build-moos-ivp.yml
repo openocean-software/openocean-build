@@ -23,12 +23,15 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.distro }}/${{ matrix.dist }})
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.distro }}/${{ matrix.dist }}/${{ matrix.arch }})
+    # Native arm64 runners (ubuntu-24.04-arm) avoid the need for QEMU
+    # emulation when cross-building arm64 packages.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     environment: release
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
         include:
           # Debian: "oldstable"/"stable"
           - distro: debian
@@ -52,12 +55,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends devscripts dpkg-dev
 
       - name: Build packages (sbuild)
-        run: make debian-sbuild DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }}
+        run: make debian-sbuild DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}
+          name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}-${{ matrix.arch }}
           # Upload all but omit *.build log which has unsupported characters
           path: |
             build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*
@@ -113,7 +116,12 @@ jobs:
           for artifact_dir in artifacts/${OOS_PACKAGE}-*; do
             [ -d "${artifact_dir}" ] || continue
             name=$(basename "${artifact_dir}")
-            distro_dist=${name#"${OOS_PACKAGE}"-}
+            # Artifact names are "${OOS_PACKAGE}-${distro}-${dist}-${arch}";
+            # strip the arch suffix since amd64/arm64 builds of the same
+            # distro/dist are published into the same (multi-arch) repo.
+            distro_dist_arch=${name#"${OOS_PACKAGE}"-}
+            arch=${distro_dist_arch##*-}
+            distro_dist=${distro_dist_arch%-"${arch}"}
             distro=${distro_dist%%-*}
             dist=${distro_dist#*-}
             repo="${OOS_PACKAGE}-${distro}-${dist}"
