@@ -18,7 +18,8 @@
 #                                        # products
 #   make distclean                       # clean + remove the Docker images
 #
-# Output .deb, etc. land in build/<package>/debs/<distro>-<dist>.
+# Output .deb, etc. land in build/<package>/<distro>-<dist>-simple (for
+# "debian") or build/<package>/<distro>-<dist>-sbuild (for "debian-sbuild").
 
 ifndef OOS_PACKAGE
 $(error OOS_PACKAGE is not set. Please run: export OOS_PACKAGE=<package name>)
@@ -61,9 +62,13 @@ DEBIAN_SBUILD_CHROOT       := $(DIST)-$(ARCH)-sbuild
 
 DEBIAN_DOCKER_IMAGE := $(OOS_PACKAGE)-simple:$(DISTRO)-$(DIST)
 DEBIAN_DOCKER_DIR   := docker/debian/simple
+# dpkg-buildpackage drops its .deb/.changes/.buildinfo directly into the
+# parent of the source directory it's invoked from, so this scratch dir
+# doubles as the final output location -- no separate move step needed.
 DEBIAN_BUILD_DIR    := $(BUILD_DIR)/$(DISTRO)-$(DIST)-simple
 DEBIAN_SRC_DIR      := $(DEBIAN_BUILD_DIR)/$(OOS_PACKAGE)-$(UPSTREAM_VERSION)
-DEBIAN_OUTPUT_DIR   := $(BUILD_DIR)/debs/$(DISTRO)-$(DIST)
+
+DEBIAN_SBUILD_OUTPUT_DIR := $(BUILD_DIR)/$(DISTRO)-$(DIST)-sbuild
 
 .PHONY: debian debian-docker-image debian-sbuild debian-sbuild-docker-image source clean distclean
 
@@ -75,7 +80,7 @@ DEBIAN_OUTPUT_DIR   := $(BUILD_DIR)/debs/$(DISTRO)-$(DIST)
 # retry commands by hand. Exit the shell to end the (still-failed) build.
 debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(DEBIAN_BUILD_DIR)
-	mkdir -p $(DEBIAN_BUILD_DIR) $(DEBIAN_OUTPUT_DIR)
+	mkdir -p $(DEBIAN_BUILD_DIR)
 	rm -rf $(SRC_DIR)/debian
 	cp -a $(OOS_PACKAGE)/debian $(SRC_DIR)/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
@@ -98,8 +103,7 @@ debian: debian-docker-image $(SRC_DIR)
 			fi; \
 			chown -R $(UID):$(GID) /build; \
 			exit $$status'
-	mv $(DEBIAN_BUILD_DIR)/*.deb $(DEBIAN_BUILD_DIR)/*.changes $(DEBIAN_BUILD_DIR)/*.buildinfo $(DEBIAN_OUTPUT_DIR)/ 2>/dev/null || true
-	@echo "Packages built in $(DEBIAN_OUTPUT_DIR)"
+	@echo "Packages built in $(DEBIAN_BUILD_DIR)"
 
 debian-docker-image: $(DEBIAN_DOCKER_DIR)/Dockerfile
 	docker build --build-arg DISTRO=$(DISTRO) --build-arg DIST=$(DIST) \
@@ -110,10 +114,10 @@ debian-docker-image: $(DEBIAN_DOCKER_DIR)/Dockerfile
 # minimal chroot, resolves deps with dose3) but closer to how a real
 # archive/buildd would build the package.
 debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
-	mkdir -p $(DEBIAN_OUTPUT_DIR)
+	mkdir -p $(DEBIAN_SBUILD_OUTPUT_DIR)
 	docker run --rm --privileged \
 		-v $(BUILD_DIR):/build \
-		-v $(DEBIAN_OUTPUT_DIR):/output \
+		-v $(DEBIAN_SBUILD_OUTPUT_DIR):/output \
 		-w /output \
 		$(DEBIAN_SBUILD_DOCKER_IMAGE) \
 		--chroot=$(DEBIAN_SBUILD_CHROOT) \
@@ -123,7 +127,7 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 		--no-clean-source \
 		--debbuildopt=-uc --debbuildopt=-us \
 		/build/$(notdir $(DSC_FILE))
-	@echo "Packages built in $(DEBIAN_OUTPUT_DIR)"
+	@echo "Packages built in $(DEBIAN_SBUILD_OUTPUT_DIR)"
 
 # Rebuilds are cheap: docker build no-ops on cache hits once the chroot
 # tarball layer exists, so this is safe to run as a prerequisite every time.
