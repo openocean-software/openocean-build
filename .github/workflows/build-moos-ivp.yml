@@ -133,7 +133,8 @@ jobs:
             repo_endpoint["${repo}"]="${endpoint}"
           done
 
-          for repo in "${!repo_dist[@]}"; do
+          while IFS= read -r repo; do
+            [ -n "${repo}" ] || continue
             dist=${repo_dist["${repo}"]}
             endpoint=${repo_endpoint["${repo}"]}
             # Each run starts from a fresh runner with an empty local aptly
@@ -151,4 +152,4 @@ jobs:
               "${repo}" \
               "${endpoint}"
             echo "::endgroup::"
-          done
+          done < <(printf '%s\n' "${!repo_dist[@]}" | sort)
