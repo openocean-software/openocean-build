@@ -23,7 +23,7 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.distro }}/${{ matrix.dist }}/${{ matrix.arch }})
+    name: Build (${{ matrix.target.distro }}/${{ matrix.target.dist }}/${{ matrix.arch }})
     # Native arm64 runners (ubuntu-24.04-arm) avoid the need for QEMU
     # emulation when cross-building arm64 packages.
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -48,16 +48,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends devscripts dpkg-dev
 
       - name: Build packages (sbuild)
-        run: make debian-sbuild DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }}
+        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}-${{ matrix.arch }}
+          name: ${{ env.OOS_PACKAGE }}-${{ matrix.target.distro }}-${{ matrix.target.dist }}-${{ matrix.arch }}
           # Upload all but omit *.build log which has unsupported characters
           path: |
-            build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*
-            !build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*.build
+            build/${{ env.OOS_PACKAGE }}/${{ matrix.target.distro }}-${{ matrix.target.dist }}-sbuild/*
+            !build/${{ env.OOS_PACKAGE }}/${{ matrix.target.distro }}-${{ matrix.target.dist }}-sbuild/*.build
           if-no-files-found: error
 
   publish:
