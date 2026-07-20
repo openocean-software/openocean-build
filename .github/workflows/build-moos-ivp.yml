@@ -88,7 +88,7 @@ jobs:
           echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
           key_id=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "sec" { print $5; exit }')
           if [ -z "${key_id}" ]; then
-            echo "::error::Failed to import a usable secret key from GPG_PRIVATE_KEY -- check the secret's contents." >&2
+            echo "::error::Failed to import a usable secret key from GPG_PRIVATE_KEY -- check the secret's contents."
             exit 1
           fi
           echo "sign_key=${key_id}" >> "$GITHUB_OUTPUT"
@@ -102,7 +102,7 @@ jobs:
             gpgconf --launch gpg-agent
             keygrip=$(gpg --list-secret-keys --with-keygrip --with-colons | awk -F: '$1 == "grp" { print $10; exit }')
             if [ -z "${keygrip}" ]; then
-              echo "::error::Could not determine the keygrip for the imported key -- unable to cache GPG_PASSPHRASE." >&2
+              echo "::error::Could not determine the keygrip for the imported key -- unable to cache GPG_PASSPHRASE."
               exit 1
             fi
             libexec_dir=$(gpgconf --list-dirs libexecdir)
