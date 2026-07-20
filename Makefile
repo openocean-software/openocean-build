@@ -79,7 +79,7 @@ debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(SRC_DIR)/debian
 	cp -a $(OOS_PACKAGE)/debian $(SRC_DIR)/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
-	docker run --rm -i \
+	docker run --rm -it \
 		-v $(DEBIAN_BUILD_DIR):/build \
 		-w /build/$(notdir $(DEBIAN_SRC_DIR)) \
 		$(DEBIAN_DOCKER_IMAGE) \
