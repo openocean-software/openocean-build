@@ -7,6 +7,19 @@
 # with a required reviewer so the workflow pauses for human sign-off before
 # any build or publish step runs. That environment must also define the
 # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets aptly uses to talk to S3.
+#
+# Signing packages (.dsc/.changes) and the published apt repos is required
+# and provisioned via the "release" Environment's secrets (Settings ->
+# Environments -> release -> Environment secrets):
+#   - GPG_PRIVATE_KEY (required): an ASCII-armored GPG private key, e.g. the
+#     output of
+#       gpg --armor --export-secret-keys YOUR_KEY_ID
+#     The workflow fails fast if this secret is not configured.
+#   - GPG_PASSPHRASE (optional): the passphrase protecting the above key,
+#     if any. If the key has no passphrase, leave this unset.
+# Both jobs import GPG_PRIVATE_KEY via crazy-max/ghaction-import-gpg; "make
+# debian-sbuild" signs the .dsc/.changes with it (see SIGN_KEY in the
+# Makefile) and aptly signs the published repos with it.
 name: Build and publish moos-ivp packages
 
 on:
@@ -45,10 +58,26 @@ jobs:
       - name: Install host build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends devscripts dpkg-dev
+          sudo apt-get install -y --no-install-recommends devscripts dpkg-dev gnupg
+
+      - name: Check GPG signing key is configured
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "${GPG_PRIVATE_KEY}" ]; then
+            echo "::error::GPG_PRIVATE_KEY secret is not configured on the 'release' Environment -- signing is required, see the workflow header for setup instructions."
+            exit 1
+          fi
+
+      - name: Import GPG signing key
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Build packages (sbuild)
-        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }}
+        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }} SIGN_KEY=${{ steps.gpg.outputs.fingerprint }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
@@ -78,7 +107,14 @@ jobs:
       - name: Install aptly
         run: |
           sudo apt-get update
-          sudo apt-get install -y aptly
+          sudo apt-get install -y aptly gnupg
+
+      - name: Import GPG signing key
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Configure aptly for S3 publishing
         run: |
@@ -86,7 +122,6 @@ jobs:
           cat > "${HOME}/.aptly.conf" <<CONF
           {
             "rootDir": "${HOME}/.aptly",
-            "gpgDisableSign": true,
             "gpgDisableVerify": true,
             "S3PublishEndpoints": {
               "openocean-build": {
@@ -98,10 +133,6 @@ jobs:
             }
           }
           CONF
-          # NOTE: signing is disabled because no GPG signing key is provisioned
-          # yet. Once a signing key is added as a secret, import it here and
-          # drop gpgDisableSign/-skip-signing below so published repos are
-          # trusted by apt without [trusted=yes].
 
       - name: Create/update repos and publish to S3
         run: |
@@ -143,7 +174,7 @@ jobs:
             echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             aptly publish repo \
               -force-overwrite \
-              -skip-signing \
+              -gpg-key="${{ steps.gpg.outputs.fingerprint }}" \
               -distribution="${dist}" \
               "${repo}" \
               "${endpoint}"
