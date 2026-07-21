@@ -47,7 +47,12 @@ RUN apt-get update && \
 # luck.
 RUN case "${DISTRO}" in \
         debian) MIRROR=http://deb.debian.org/debian; COMPONENTS=main ;; \
-        ubuntu) MIRROR=http://archive.ubuntu.com/ubuntu; COMPONENTS=main,universe ;; \
+        ubuntu) \
+            case "${ARCH}" in \
+                amd64|i386) MIRROR=http://archive.ubuntu.com/ubuntu ;; \
+                *)           MIRROR=http://ports.ubuntu.com/ubuntu-ports ;; \
+            esac; \
+            COMPONENTS=main,universe ;; \
         *) echo "Unsupported DISTRO '${DISTRO}'" >&2; exit 1 ;; \
     esac; \
     mkdir -p /srv/chroot/${DIST}-${ARCH} && \
