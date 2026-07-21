@@ -36,7 +36,7 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.distro }}/${{ matrix.dist }}/${{ matrix.arch }})
+    name: Build (${{ matrix.target.distro }}/${{ matrix.target.dist }}/${{ matrix.arch }})
     # Native arm64 runners (ubuntu-24.04-arm) avoid the need for QEMU
     # emulation when cross-building arm64 packages.
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -45,19 +45,12 @@ jobs:
       fail-fast: false
       matrix:
         arch: [amd64, arm64]
-        include:
-          # Debian: "oldstable"/"stable"
-          - distro: debian
-            dist: bookworm
-          - distro: debian
-            dist: trixie
-          # Ubuntu: currently supported LTS series.
-          - distro: ubuntu
-            dist: jammy
-          - distro: ubuntu
-            dist: noble
-          - distro: ubuntu
-            dist: resolute
+        target:
+          - { distro: debian, dist: bookworm }
+          - { distro: debian, dist: trixie }
+          - { distro: ubuntu, dist: jammy }
+          - { distro: ubuntu, dist: noble }
+          - { distro: ubuntu, dist: resolute }
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -113,16 +106,16 @@ jobs:
           fi
 
       - name: Build packages (sbuild)
-        run: make debian-sbuild DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} SIGN_KEY=${{ steps.gpg.outputs.sign_key }}
+        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }} SIGN_KEY=${{ steps.gpg.outputs.sign_key }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.OOS_PACKAGE }}-${{ matrix.distro }}-${{ matrix.dist }}-${{ matrix.arch }}
+          name: ${{ env.OOS_PACKAGE }}-${{ matrix.target.distro }}-${{ matrix.target.dist }}-${{ matrix.arch }}
           # Upload all but omit *.build log which has unsupported characters
           path: |
-            build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*
-            !build/${{ env.OOS_PACKAGE }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*.build
+            build/${{ env.OOS_PACKAGE }}/${{ matrix.target.distro }}-${{ matrix.target.dist }}-sbuild/*
+            !build/${{ env.OOS_PACKAGE }}/${{ matrix.target.distro }}-${{ matrix.target.dist }}-sbuild/*.build
           if-no-files-found: error
 
   publish:
@@ -171,6 +164,8 @@ jobs:
       - name: Create/update repos and publish to S3
         run: |
           set -euo pipefail
+          publish_repos=$(mktemp)
+          trap 'rm -f "${publish_repos}"' EXIT
           for artifact_dir in artifacts/${OOS_PACKAGE}-*; do
             [ -d "${artifact_dir}" ] || continue
             name=$(basename "${artifact_dir}")
@@ -185,7 +180,6 @@ jobs:
             repo="${OOS_PACKAGE}-${distro}-${dist}"
             endpoint="s3:openocean-build:${distro}-${dist}"
 
-            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             # Guard "repo create" so re-running this step (e.g. a re-run of a
             # failed job against the same local aptly database) doesn't abort
             # the loop just because the local repo was already created.
@@ -193,7 +187,10 @@ jobs:
               aptly repo create -distribution="${dist}" -component=main "${repo}"
             fi
             aptly repo add "${repo}" "${artifact_dir}"
+            printf '%s\t%s\t%s\n' "${repo}" "${dist}" "${endpoint}" >> "${publish_repos}"
+          done
 
+          while IFS=$'\t' read -r repo dist endpoint; do
             # Each run starts from a fresh runner with an empty local aptly
             # database, so it never has a record of a previous publish --
             # "publish repo" (first publish) is always the right call here,
@@ -201,6 +198,7 @@ jobs:
             # -force-overwrite lets it overwrite pool files already present
             # in the bucket from earlier runs (e.g. a re-triggered workflow)
             # without failing on checksum mismatches for identical content.
+            echo "::group::Publishing ${repo} (distribution=${dist}) to ${endpoint}"
             aptly publish repo \
               -force-overwrite \
               -skip-signing \
@@ -208,4 +206,4 @@ jobs:
               "${repo}" \
               "${endpoint}"
             echo "::endgroup::"
-          done
+          done < <(sort -u "${publish_repos}")
