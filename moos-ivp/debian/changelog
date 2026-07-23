@@ -1,3 +1,14 @@
+moos-ivp (24.8.1+dfsg-2) trixie; urgency=medium
+
+  * Add SOVERSION to libMOOSGeodesy so dh_shlibdeps can generate an
+    automatic Depends on libmoos-ivp for packages linking against it
+    (e.g. moos-ivp-apps).
+  * Install the new versioned libMOOSGeodesy.so.* into libmoos-ivp, and
+    move the unversioned libMOOSGeodesy.so dev symlink to
+    libmoos-ivp-dev, matching the libmoos10-mit/libmoos10-mit-dev split.
+
+ -- Toby Schneider <toby@gobysoft.org>  Thu, 23 Jul 2026 07:00:00 +1000
+
 moos-ivp (24.8.1+dfsg-1) trixie; urgency=medium
 
   * Add moos-ivp-missions package, installing the example missions as
