@@ -1,7 +1,12 @@
+moos-ivp (24.8.1+dfsg-1) trixie; urgency=medium
+
+  * Add moos-ivp-missions package, installing the example missions as
+    /usr/share/ivp/missions.tgz.
+
+ -- Toby Schneider <toby@gobysoft.org>  Thu, 23 Jul 2026 05:52:00 +1000
+
 moos-ivp (24.8.1+dfsg-0) trixie; urgency=medium
 
   * Initial release.
-  * Add moos-ivp-missions package, installing the example missions as
-    /usr/share/ivp/missions.tgz.
 
  -- Toby Schneider <toby@gobysoft.org>  Thu, 16 Jul 2026 16:38:02 +1000
