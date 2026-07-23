@@ -2,13 +2,13 @@
 # "openocean-build" S3 bucket (us-east-1) via aptly.
 #
 # Triggered whenever moos-ivp/debian/changelog changes (i.e. a new release
-# is cut), but gated behind manual approval: both jobs target the "release"
-# GitHub Environment, which must be configured (Settings -> Environments)
+# is cut), but gated behind manual approval: the 'publish' job targets the "release"
+# GitHub Environment, which is  configured (Settings -> Environments)
 # with a required reviewer so the workflow pauses for human sign-off before
-# any build or publish step runs. That environment must also define the
+# any build or publish step runs. That environment also defines
 # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets aptly uses to talk to S3.
 #
-# Signing packages (.dsc/.changes) and the published apt repos is required
+# Signing the published apt repos is required
 # and provisioned via the "release" Environment's secrets (Settings ->
 # Environments -> release -> Environment secrets):
 #   - GPG_PRIVATE_KEY (required): an ASCII-armored GPG private key, e.g. the
@@ -17,9 +17,8 @@
 #     The workflow fails fast if this secret is not configured.
 #   - GPG_PASSPHRASE (optional): the passphrase protecting the above key,
 #     if any. If the key has no passphrase, leave this unset.
-# Both jobs import GPG_PRIVATE_KEY via crazy-max/ghaction-import-gpg; "make
-# debian-sbuild" signs the .dsc/.changes with it (see SIGN_KEY in the
-# Makefile) and aptly signs the published repos with it.
+# The 'publish' job imports GPG_PRIVATE_KEY via crazy-max/ghaction-import-gpg:
+# aptly signs the published repos with it.
 name: Build and publish moos-ivp packages
 
 on:
@@ -42,7 +41,6 @@ jobs:
     # Native arm64 runners (ubuntu-24.04-arm) avoid the need for QEMU
     # emulation when cross-building arm64 packages.
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    environment: release
     strategy:
       fail-fast: false
       matrix:
@@ -62,26 +60,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends devscripts dpkg-dev gnupg
 
-      - name: Check GPG signing key is configured
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: |
-          if [ -z "${GPG_PRIVATE_KEY}" ]; then
-            echo "::error::GPG_PRIVATE_KEY secret is not configured on the 'release' Environment -- signing is required, see the workflow header for setup instructions."
-            exit 1
-          fi
-
-      - name: Import GPG signing key
-        id: gpg
-        uses: crazy-max/ghaction-import-gpg@v7
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          # signing subkey
-          fingerprint: "D7D7224D53A4F29E303FE01DEB505B68A5D063B0"
-
       - name: Build packages (sbuild)
-        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }} SIGN_KEY=${{ steps.gpg.outputs.fingerprint }}
+        run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
@@ -128,7 +108,6 @@ jobs:
           cat > "${HOME}/.aptly.conf" <<CONF
           {
             "rootDir": "${HOME}/.aptly",
-            "gpgDisableVerify": true,
             "S3PublishEndpoints": {
               "openocean-build": {
                 "region": "us-east-1",
