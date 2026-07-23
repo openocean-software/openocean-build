@@ -75,6 +75,8 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          # signing subkey
+          fingerprint: "D7D7224D53A4F29E303FE01DEB505B68A5D063B0"
 
       - name: Build packages (sbuild)
         run: make debian-sbuild DISTRO=${{ matrix.target.distro }} DIST=${{ matrix.target.dist }} ARCH=${{ matrix.arch }} SIGN_KEY=${{ steps.gpg.outputs.fingerprint }}
@@ -115,6 +117,8 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          # signing subkey
+          fingerprint: "D7D7224D53A4F29E303FE01DEB505B68A5D063B0"
 
       - name: Configure aptly for S3 publishing
         run: |
