@@ -1,0 +1,14 @@
+--- a/MOOS_Jul0519/MOOSGeodesy/libMOOSGeodesy/CMakeLists.txt
++++ b/MOOS_Jul0519/MOOSGeodesy/libMOOSGeodesy/CMakeLists.txt
+@@ -68,6 +68,11 @@
+ add_library(${LIBNAME} ${SOURCES} ${PUBLIC_HEADERS})
+ target_link_libraries(${LIBNAME} ${${LIBNAME}_DEPEND_LIBRARIES})
+ 
++# Set SOVERSION so dh_makeshlibs/dpkg-shlibdeps can generate a proper
++# shlibs entry, letting reverse dependencies (e.g. moos-ivp-apps) pick up
++# an automatic Depends on the package providing libMOOSGeodesy.
++set_target_properties(${LIBNAME} PROPERTIES VERSION "1" SOVERSION "1")
++
+ #######################################
+ # install headers
+ install(DIRECTORY ${INCLUDE_ROOTS} DESTINATION ${CMAKE_INSTALL_PREFIX} FILES_MATCHING PATTERN "*.h")
