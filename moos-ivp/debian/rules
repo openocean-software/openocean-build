@@ -52,7 +52,7 @@ override_dh_auto_install:
 	dh_auto_install --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
 	mkdir -p debian/tmp/usr/share/ivp
 	tar --sort=name --owner=0 --group=0 --mtime='@$(SOURCE_DATE_EPOCH)' \
-		-czf debian/tmp/usr/share/ivp/missions.tgz -C $(CURDIR)/ivp missions
+		-czf debian/tmp/usr/share/ivp/missions.tgz -C $(CURDIR)/ivp missions data
 
 override_dh_auto_clean:
 	dh_auto_clean --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR)
