@@ -2,6 +2,11 @@
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
+# dpkg-buildpackage exports this automatically (from the latest
+# debian/changelog entry), but fall back to the current time for direct
+# "debian/rules" invocations so the tar step below always has a value.
+SOURCE_DATE_EPOCH ?= $(shell date +%s)
+
 MOOS_CORE_SRC_DIR=$(CURDIR)/MOOS/MOOSCore
 MOOS_CORE_BUILD_DIR = $(CURDIR)/build/MOOS/MOOSCore
 MOOS_CORE_CMAKE_EXTRA_FLAGS = -DUSE_ASYNC_COMMS=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5
@@ -45,6 +50,9 @@ override_dh_auto_install:
 	dh_auto_install --sourcedirectory=$(IVP_SRC_DIR) --builddirectory=$(IVP_BUILD_DIR)
 	dh_auto_install --sourcedirectory=$(MOOS_ESSENTIALS_SRC_DIR) --builddirectory=$(MOOS_ESSENTIALS_BUILD_DIR)
 	dh_auto_install --sourcedirectory=$(MOOS_TOOLSUI_SRC_DIR) --builddirectory=$(MOOS_TOOLSUI_BUILD_DIR)
+	mkdir -p debian/tmp/usr/share/ivp
+	tar --sort=name --owner=0 --group=0 --mtime='@$(SOURCE_DATE_EPOCH)' \
+		-czf debian/tmp/usr/share/ivp/missions.tgz -C $(CURDIR)/ivp missions
 
 override_dh_auto_clean:
 	dh_auto_clean --sourcedirectory=$(MOOS_CORE_SRC_DIR) --builddirectory=$(MOOS_CORE_BUILD_DIR)

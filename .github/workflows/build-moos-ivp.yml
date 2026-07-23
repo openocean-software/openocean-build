@@ -24,6 +24,8 @@ name: Build and publish moos-ivp packages
 
 on:
   push:
+    branches:
+      - main
     paths:
       - moos-ivp/debian/changelog
   workflow_dispatch: {}
