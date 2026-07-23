@@ -138,3 +138,11 @@ Description: ALOG log processing utilities provided by the MOOS-IvP autonomy fra
  MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space.  The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors.
  This package provides the ALOG log processing utilities provided by MOOS-IvP.
 
+Package: moos-ivp-missions
+Depends: ${misc:Depends}
+Section: science
+Architecture: all
+Description: Example missions for the MOOS-IvP autonomy framework.
+ MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space. The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors.
+ This package provides the example missions distributed with MOOS-IvP, packaged as /usr/share/ivp/missions.tgz.
+
