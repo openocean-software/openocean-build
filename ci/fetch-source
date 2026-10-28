@@ -12,13 +12,22 @@ destdir=${2:?usage: fetch-source <project> <destdir>}
 mkdir -p "${destdir}"
 case "$("${root}/ci/project-config" "${project}" get source)" in
     uscan)
-        # Pin the changelog's version, or uscan fetches the newest upstream
-        # release. Not --download-current-version: that applies the watch
-        # file's dversionmangle, so with a uversionmangle (e.g. +dfsg) it
-        # never matches.
-        version=$(dpkg-parsechangelog -l "${root}/projects/${project}/debian/changelog" -S Version)
-        upstream_version=${version#*:}
-        upstream_version=${upstream_version%-*}
-        uscan --destdir="${destdir}" --download-version "${upstream_version}" --verbose "${root}/projects/${project}"
+        # uscan fetches the newest upstream release; pinning a version with
+        # --download-version or --download-current-version doesn't match
+        # releases renamed by uversionmangle (e.g. +dfsg) on every devscripts
+        # version, so check afterwards that it fetched the changelog's.
+        uscan --destdir="${destdir}" --verbose "${root}/projects/${project}"
         ;;
 esac
+
+changelog="${root}/projects/${project}/debian/changelog"
+source=$(dpkg-parsechangelog -l "${changelog}" -S Source)
+version=$(dpkg-parsechangelog -l "${changelog}" -S Version)
+upstream_version=${version#*:}
+upstream_version=${upstream_version%-*}
+shopt -s nullglob
+orig=("${destdir}/${source}_${upstream_version}".orig.tar.*)
+if [ ${#orig[@]} -eq 0 ]; then
+    echo "fetch-source: expected ${source}_${upstream_version}.orig.tar.* in ${destdir}; upstream may have released a newer version than debian/changelog's ${version}" >&2
+    exit 1
+fi
