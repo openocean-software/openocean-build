@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Fetches the upstream source for the version in a project's debian/changelog
+# and leaves it in <destdir> as the .orig tarball dpkg-source expects.
+#
+# Usage: fetch-source <project> <destdir>
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+project=${1:?usage: fetch-source <project> <destdir>}
+destdir=${2:?usage: fetch-source <project> <destdir>}
+
+mkdir -p "${destdir}"
+case "$("${root}/ci/project-config" "${project}" get source)" in
+    uscan)
+        # uscan fetches the newest upstream release; pinning a version with
+        # --download-version or --download-current-version doesn't match
+        # releases renamed by uversionmangle (e.g. +dfsg) on every devscripts
+        # version, so check afterwards that it fetched the changelog's.
+        uscan --destdir="${destdir}" --verbose "${root}/projects/${project}"
+        ;;
+esac
+
+changelog="${root}/projects/${project}/debian/changelog"
+source=$(dpkg-parsechangelog -l "${changelog}" -S Source)
+version=$(dpkg-parsechangelog -l "${changelog}" -S Version)
+upstream_version=${version#*:}
+upstream_version=${upstream_version%-*}
+shopt -s nullglob
+orig=("${destdir}/${source}_${upstream_version}".orig.tar.*)
+if [ ${#orig[@]} -eq 0 ]; then
+    echo "fetch-source: expected ${source}_${upstream_version}.orig.tar.* in ${destdir}; upstream may have released a newer version than debian/changelog's ${version}" >&2
+    exit 1
+fi

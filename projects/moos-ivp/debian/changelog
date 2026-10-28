@@ -1,3 +1,11 @@
+moos-ivp (24.8.1+dfsg-3) trixie; urgency=medium
+
+  * Stop shipping the IvP and MOOSGeodesy headers in libmoos10-mit-dev,
+    and the MOOS core headers in libmoos-ivp-dev, so the two can be
+    installed together. libmoos-ivp-dev now depends on libmoos10-mit-dev.
+
+ -- Toby Schneider <toby@gobysoft.org>  Wed, 28 Oct 2026 14:00:00 +1000
+
 moos-ivp (24.8.1+dfsg-2) trixie; urgency=medium
 
   * Add SOVERSION to libMOOSGeodesy so dh_shlibdeps can generate an

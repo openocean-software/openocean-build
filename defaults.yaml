@@ -1,0 +1,27 @@
+# Settings shared by every project in projects/. A project's project.yaml
+# overrides any of these; mappings merge key by key, lists are replaced.
+
+targets:
+  arch: [amd64, arm64]
+  dists:
+    - { distro: debian, dist: bookworm }
+    - { distro: debian, dist: trixie }
+    - { distro: ubuntu, dist: jammy }
+    - { distro: ubuntu, dist: noble }
+    - { distro: ubuntu, dist: resolute }
+
+# Each channel is its own apt repository under apt/<prefix><distro>-<dist>
+# in the bucket, published from the named GitHub Environment. It is signed
+# with the (sub)key signing_key, whose public key is in key.
+channels:
+  release:
+    prefix: release/
+    environment: release
+    signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
+    key: keys/release.asc
+
+# Where every newly built package is installed before publishing.
+install_test:
+  target: { distro: ubuntu, dist: resolute, arch: amd64 }
+  packages: []
+  commands: []

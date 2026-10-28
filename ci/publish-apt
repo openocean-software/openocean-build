@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Publishes built .deb files to a channel's apt repositories, keeping what is already published.
+
+Each run starts from an empty aptly database, so publishing only the new
+packages would replace each distribution's index with just those. Instead,
+for each <distro>-<dist>, this fetches the packages the published index
+already lists (checking the InRelease signature and every checksum), adds the
+new ones, and publishes the lot.
+
+Usage:
+  publish-apt --target s3://openocean-build/apt --prefix release/ \\
+              --gpg-key <fingerprint> <artifacts-dir>
+
+<artifacts-dir> holds one directory per build, named
+deb_<project>_<distro>_<dist>_<arch> (see build-debian.yml). --target may also
+be file:///some/dir, for testing without S3.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+ARTIFACT_DIR = re.compile(r"^deb_(?P<project>[^_]+)_(?P<distro>[^_]+)_(?P<dist>[^_]+)_(?P<arch>[^_]+)$")
+ENDPOINT = "oos"
+
+
+class PublishError(Exception):
+    pass
+
+
+def run(*args, **kwargs):
+    print("+", " ".join(str(a) for a in args), flush=True)
+    return subprocess.run([str(a) for a in args], check=True, **kwargs)
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+class Store:
+    """Reads files from where the repositories are published, and names the aptly endpoint for it."""
+
+    def __init__(self, target):
+        url = urlparse(target)
+        self.scheme = url.scheme
+        if url.scheme == "s3":
+            self.bucket = url.netloc
+            self.key_prefix = url.path.strip("/") + "/" if url.path.strip("/") else ""
+        elif url.scheme == "file":
+            self.root = Path(url.path)
+        else:
+            raise PublishError(f"--target must be s3://bucket/prefix or file:///dir, not {target}")
+
+    def aptly_endpoints(self):
+        if self.scheme == "s3":
+            return {"S3PublishEndpoints": {ENDPOINT: {
+                "region": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+                "bucket": self.bucket,
+                "acl": "",
+                "prefix": self.key_prefix,
+            }}}
+        return {"FileSystemPublishEndpoints": {ENDPOINT: {"rootDir": str(self.root), "linkMethod": "copy"}}}
+
+    def aptly_endpoint(self, prefix):
+        return f"{'s3' if self.scheme == 's3' else 'filesystem'}:{ENDPOINT}:{prefix}"
+
+    def fetch(self, path, dest):
+        """Copies a published file to dest. Returns False if it doesn't exist."""
+        if self.scheme == "file":
+            src = self.root / path
+            if not src.is_file():
+                return False
+            shutil.copyfile(src, dest)
+            return True
+        result = subprocess.run(
+            ["aws", "s3", "cp", "--only-show-errors", f"s3://{self.bucket}/{self.key_prefix}{path}", str(dest)],
+            capture_output=True, text=True)
+        if result.returncode == 0:
+            return True
+        if re.search(r"\(404\)|Not Found|does not exist", result.stderr):
+            return False
+        # Without s3:ListBucket, S3 reports a missing key as 403, which can't
+        # be told apart from a real permissions problem.
+        raise PublishError(f"fetching s3://{self.bucket}/{self.key_prefix}{path} failed:\n{result.stderr}")
+
+
+def verified_release(inrelease, gpg_key, workdir):
+    """Returns the text of an InRelease file after checking it was signed by gpg_key."""
+    plain = workdir / "Release"
+    result = subprocess.run(
+        ["gpg", "--batch", "--status-fd", "1", "--output", str(plain), "--decrypt", str(inrelease)],
+        capture_output=True, text=True)
+    signers = [line.split()[2:] for line in result.stdout.splitlines() if line.startswith("[GNUPG:] VALIDSIG ")]
+    key = gpg_key.upper().replace(" ", "")
+    if result.returncode != 0 or not any(key in fields for fields in signers):
+        raise PublishError(f"{inrelease} isn't validly signed by {gpg_key}:\n{result.stdout}{result.stderr}")
+    return plain.read_text()
+
+
+def release_indexes(release_text):
+    """Yields (path, sha256, size) for each uncompressed binary Packages index in a Release file."""
+    in_sha256 = False
+    for line in release_text.splitlines():
+        if not line.startswith(" "):
+            in_sha256 = line.strip() == "SHA256:"
+            continue
+        if in_sha256:
+            digest, size, path = line.split()
+            if re.fullmatch(r"[^/]+/binary-[^/]+/Packages", path):
+                yield path, digest, int(size)
+
+
+def stanzas(text):
+    for block in re.split(r"\n\s*\n", text.strip()):
+        fields = {}
+        for line in block.splitlines():
+            if line and not line[0].isspace() and ":" in line:
+                key, value = line.split(":", 1)
+                fields[key] = value.strip()
+        if fields:
+            yield fields
+
+
+def check(path, digest, size=None):
+    if (size is not None and path.stat().st_size != size) or sha256(path) != digest:
+        raise PublishError(f"{path} doesn't match the checksum in the published index")
+
+
+def fetch_published(store, repo_path, dist, gpg_key, workdir):
+    """Downloads the packages the published index lists, checked against it. Returns their paths."""
+    inrelease = workdir / "InRelease"
+    if not store.fetch(f"{repo_path}/dists/{dist}/InRelease", inrelease):
+        print(f"Nothing published at {repo_path} yet", flush=True)
+        return []
+    release = verified_release(inrelease, gpg_key, workdir)
+
+    packages = {}
+    for index_path, digest, size in release_indexes(release):
+        index = workdir / index_path.replace("/", "_")
+        if not store.fetch(f"{repo_path}/dists/{dist}/{index_path}", index):
+            raise PublishError(f"{repo_path}: Release lists {index_path}, but it isn't published")
+        check(index, digest, size)
+        for fields in stanzas(index.read_text()):
+            packages[fields["Filename"]] = fields
+
+    pool = workdir / "pool"
+    pool.mkdir()
+    paths = []
+    for filename, fields in sorted(packages.items()):
+        dest = pool / Path(filename).name
+        if not store.fetch(f"{repo_path}/{filename}", dest):
+            raise PublishError(f"{repo_path}: the index lists {filename}, but it isn't published")
+        check(dest, fields["SHA256"], int(fields["Size"]))
+        paths.append(dest)
+    print(f"Keeping {len(paths)} published package files from {repo_path}", flush=True)
+    return paths
+
+
+def group_artifacts(artifacts):
+    """Maps (distro, dist) to the .deb files built for it."""
+    groups = {}
+    for d in sorted(Path(artifacts).iterdir()):
+        match = ARTIFACT_DIR.match(d.name)
+        if not d.is_dir() or not match:
+            continue
+        debs = sorted(d.glob("*.deb"))
+        if not debs:
+            raise PublishError(f"{d} has no .deb files")
+        groups.setdefault((match["distro"], match["dist"]), []).extend(debs)
+    if not groups:
+        raise PublishError(f"no deb_<project>_<distro>_<dist>_<arch> directories in {artifacts}")
+    return groups
+
+
+def publish(store, prefix, gpg_key, artifacts):
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        config = tmp / "aptly.conf"
+        config.write_text(json.dumps({"rootDir": str(tmp / "aptly"), **store.aptly_endpoints()}))
+        aptly = ["aptly", f"-config={config}"]
+
+        for (distro, dist), debs in group_artifacts(artifacts).items():
+            repo_path = f"{prefix}{distro}-{dist}"
+            workdir = tmp / repo_path.replace("/", "_")
+            workdir.mkdir()
+            existing = fetch_published(store, repo_path, dist, gpg_key, workdir)
+
+            repo = f"{distro}-{dist}"
+            run(*aptly, "repo", "create", f"-distribution={dist}", "-component=main", repo)
+            if existing:
+                run(*aptly, "repo", "add", repo, *existing)
+            # A rebuild of an already published version replaces it.
+            run(*aptly, "repo", "add", "-force-replace", repo, *debs)
+            run(*aptly, "publish", "repo", "-batch", "-force-overwrite", f"-gpg-key={gpg_key}",
+                f"-distribution={dist}", repo, store.aptly_endpoint(repo_path))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--target", required=True, help="s3://bucket/prefix or file:///dir")
+    parser.add_argument("--prefix", required=True, help="channel prefix, e.g. release/")
+    parser.add_argument("--gpg-key", required=True, help="fingerprint of the signing (sub)key")
+    parser.add_argument("artifacts", help="directory of deb_<project>_<distro>_<dist>_<arch> directories")
+    args = parser.parse_args()
+    if args.prefix and not args.prefix.endswith("/"):
+        parser.error("--prefix must end with /")
+    publish(Store(args.target), args.prefix, args.gpg_key, args.artifacts)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except PublishError as e:
+        sys.exit(f"publish-apt: {e}")

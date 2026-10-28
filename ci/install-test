@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Installs freshly built packages on a clean system, as the root user of a
+# throwaway container, then runs the project's own checks.
+#
+# Usage: install-test <debs-dir> <script> [<source-tarball>] [<repo-url> <dist> <keyring>]
+#
+# <script> comes from "project-config <project> install-script" and runs in
+# the unpacked <source-tarball>, if given. With <repo-url>, the versions of
+# these packages already published there are installed first, so installing
+# the new ones also tests upgrading.
+set -euo pipefail
+
+debs=$(realpath "${1:?usage: install-test <debs-dir> <script> [<source-tarball>] [<repo-url> <dist> <keyring>]}")
+script=$(realpath "${2:?missing <script>}")
+source_tarball=${3:-}
+repo_url=${4:-}
+dist=${5:-}
+keyring=${6:-}
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+
+shopt -s nullglob
+new_debs=("${debs}"/*.deb)
+if [ ${#new_debs[@]} -eq 0 ]; then
+    echo "No .deb files in ${debs}" >&2
+    exit 1
+fi
+names=()
+for deb in "${new_debs[@]}"; do
+    names+=("$(dpkg-deb -f "${deb}" Package)")
+done
+
+if [ -n "${repo_url}" ]; then
+    apt-get install -y --no-install-recommends ca-certificates
+    install -D -m 0644 "${keyring}" /etc/apt/keyrings/openocean.asc
+    printf 'Types: deb\nURIs: %s\nSuites: %s\nComponents: main\nSigned-By: /etc/apt/keyrings/openocean.asc\n' \
+        "${repo_url}" "${dist}" > /etc/apt/sources.list.d/openocean.sources
+    if ! apt-get update 2>&1 | tee /tmp/apt-update.log; then
+        # S3 answers 403, not 404, for a missing key when listing isn't allowed.
+        if grep -qE "does not have a Release file|403 +Forbidden|404 +Not Found" /tmp/apt-update.log; then
+            echo "::warning::Nothing published at ${repo_url} yet (or it isn't readable); skipping the upgrade check"
+            rm /etc/apt/sources.list.d/openocean.sources
+            apt-get update
+        else
+            exit 1
+        fi
+    fi
+    published=()
+    for name in "${names[@]}"; do
+        # Only our repository's versions, not a same-named package from the distribution
+        if apt-cache madison "${name}" | grep -qF "${repo_url}"; then
+            published+=("${name}")
+        fi
+    done
+    if [ ${#published[@]} -gt 0 ]; then
+        echo "Installing the published ${published[*]} before upgrading"
+        apt-get install -y "${published[@]}"
+    fi
+fi
+
+apt-get install -y "${new_debs[@]}"
+dpkg-query -W -f '${Package} ${Version}\n' "${names[@]}"
+
+workdir=$(mktemp -d)
+if [ -n "${source_tarball}" ]; then
+    tar -xf "${source_tarball}" -C "${workdir}" --strip-components=1
+fi
+cd "${workdir}"
+bash "${script}"
