@@ -12,8 +12,13 @@ destdir=${2:?usage: fetch-source <project> <destdir>}
 mkdir -p "${destdir}"
 case "$("${root}/ci/project-config" "${project}" get source)" in
     uscan)
-        # Without --download-current-version uscan fetches the newest
-        # upstream release, which may not be the one the changelog names.
-        uscan --destdir="${destdir}" --download-current-version --verbose "${root}/projects/${project}"
+        # Pin the changelog's version, or uscan fetches the newest upstream
+        # release. Not --download-current-version: that applies the watch
+        # file's dversionmangle, so with a uversionmangle (e.g. +dfsg) it
+        # never matches.
+        version=$(dpkg-parsechangelog -l "${root}/projects/${project}/debian/changelog" -S Version)
+        upstream_version=${version#*:}
+        upstream_version=${upstream_version%-*}
+        uscan --destdir="${destdir}" --download-version "${upstream_version}" --verbose "${root}/projects/${project}"
         ;;
 esac

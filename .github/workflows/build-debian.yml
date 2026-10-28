@@ -67,7 +67,7 @@ jobs:
       key: ${{ steps.config.outputs.key }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read settings
         id: config
@@ -102,7 +102,7 @@ jobs:
         include: ${{ fromJSON(needs.config.outputs.matrix) }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install host build tools
         run: |
@@ -131,7 +131,7 @@ jobs:
           if-no-files-found: error
 
   install-test:
-    name: Install test (${{ fromJSON(needs.config.outputs.install_target).distro }}/${{ fromJSON(needs.config.outputs.install_target).dist }}/${{ fromJSON(needs.config.outputs.install_target).arch }})
+    name: Install test
     needs: [config, build]
     runs-on: ${{ fromJSON(needs.config.outputs.install_target).arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container: ${{ fromJSON(needs.config.outputs.install_target).distro }}:${{ fromJSON(needs.config.outputs.install_target).dist }}
@@ -140,7 +140,7 @@ jobs:
       DIST: ${{ fromJSON(needs.config.outputs.install_target).dist }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download built packages
         uses: actions/download-artifact@v4
@@ -189,7 +189,7 @@ jobs:
       AWS_DEFAULT_REGION: us-east-1
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download built packages
         uses: actions/download-artifact@v4
