@@ -22,11 +22,11 @@ We are working to support multiple distribution ecosystems, based on a tiered ap
 
 *This section was written by Claude.*
 
-Packages are published per channel at `apt/<channel>/<distro>-<dist>`. For example, the release channel for Debian trixie, in `/etc/apt/sources.list.d/openocean.sources`:
+Packages are published per channel at `https://apt.oceansoft.org/<channel>/<distro>-<dist>`. For example, the release channel for Debian trixie, in `/etc/apt/sources.list.d/openocean.sources`:
 
 ```
 Types: deb
-URIs: https://openocean-build.s3.us-east-1.amazonaws.com/apt/release/debian-trixie
+URIs: https://apt.oceansoft.org/release/debian-trixie
 Suites: trixie
 Components: main
 Signed-By: /usr/share/keyrings/openocean-release.asc
@@ -38,7 +38,7 @@ For prereleases, add the beta channel as well, signed with the same key:
 
 ```
 Types: deb
-URIs: https://openocean-build.s3.us-east-1.amazonaws.com/apt/beta/debian-trixie
+URIs: https://apt.oceansoft.org/beta/debian-trixie
 Suites: trixie
 Components: main
 Signed-By: /usr/share/keyrings/openocean-release.asc

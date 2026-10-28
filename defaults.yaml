@@ -10,6 +10,9 @@ targets:
     - { distro: ubuntu, dist: noble }
     - { distro: ubuntu, dist: resolute }
 
+# Where users read the channels: CloudFront in front of the bucket's apt/.
+apt_url: https://apt.oceansoft.org
+
 # Each channel is its own apt repository under apt/<prefix><distro>-<dist>
 # in the bucket, published from the named GitHub Environment. It is signed
 # with the (sub)key signing_key, whose public key is in key.
