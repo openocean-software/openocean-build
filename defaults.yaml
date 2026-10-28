@@ -11,9 +11,14 @@ targets:
     - { distro: ubuntu, dist: resolute }
 
 # Each channel is its own apt repository under apt/<prefix><distro>-<dist>
-# in the bucket, published from the named GitHub Environment.
+# in the bucket, published from the named GitHub Environment. It is signed
+# with the (sub)key signing_key, whose public key is in key.
 channels:
-  release: { prefix: "release/", environment: release }
+  release:
+    prefix: release/
+    environment: release
+    signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
+    key: keys/release.asc
 
 # Where every newly built package is installed before publishing.
 install_test:

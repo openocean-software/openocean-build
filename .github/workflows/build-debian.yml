@@ -1,0 +1,217 @@
+# Builds one project's Debian/Ubuntu packages, installs them on a clean
+# system, and (with publish: true) publishes them to one channel's apt
+# repositories in the "openocean-build" S3 bucket (us-east-1) via aptly.
+#
+# Called by release.yml, and by check.yml for pull requests, which build only
+# the install-test target and never publish.
+#
+# Publishing runs in the GitHub Environment that defaults.yaml names for the
+# channel ("release" for the release channel). That environment should have a
+# required reviewer, so publishing waits for human sign-off, and these
+# secrets:
+#   - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: write access to the
+#     channel's prefix in the bucket.
+#   - GPG_PRIVATE_KEY (required): an ASCII-armored GPG private key, e.g. the
+#     output of
+#       gpg --armor --export-secret-keys YOUR_KEY_ID
+#     holding the channel's signing_key from defaults.yaml.
+#   - GPG_PASSPHRASE (optional): the passphrase protecting the above key,
+#     if any.
+#
+# The install test also tests upgrading from the packages already published,
+# once the APT_BASE_URL repository variable is set to where the bucket is
+# served (e.g. https://openocean-build.s3.amazonaws.com) and the channel's
+# public key is committed at its key path in defaults.yaml.
+name: Build Debian packages
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Project in projects/
+        type: string
+        required: true
+      channel:
+        description: Channel in defaults.yaml to publish to
+        type: string
+        default: release
+      publish:
+        type: boolean
+        default: false
+      all_targets:
+        description: Build every target, rather than only the install-test target
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PROJECT: ${{ inputs.project }}
+
+jobs:
+  config:
+    name: Read project settings
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.config.outputs.matrix }}
+      install_target: ${{ steps.config.outputs.install_target }}
+      install_script: ${{ steps.config.outputs.install_script }}
+      prefix: ${{ steps.config.outputs.prefix }}
+      environment: ${{ steps.config.outputs.environment }}
+      signing_key: ${{ steps.config.outputs.signing_key }}
+      key: ${{ steps.config.outputs.key }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read settings
+        id: config
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          ALL_TARGETS: ${{ inputs.all_targets }}
+        run: |
+          set -euo pipefail
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+          matrix_args=()
+          [ "${ALL_TARGETS}" = true ] || matrix_args+=(--install-test-only)
+          {
+            echo "matrix=$(ci/project-config "${PROJECT}" matrix "${matrix_args[@]}")"
+            echo "install_target=$(ci/project-config "${PROJECT}" get install_test.target)"
+            for setting in prefix environment signing_key key; do
+              echo "${setting}=$(ci/project-config "${PROJECT}" get "channels.${CHANNEL}.${setting}")"
+            done
+            echo "install_script<<INSTALL_SCRIPT_EOF"
+            ci/project-config "${PROJECT}" install-script
+            echo "INSTALL_SCRIPT_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build (${{ matrix.distro }}/${{ matrix.dist }}/${{ matrix.arch }})
+    needs: config
+    # Native arm64 runners (ubuntu-24.04-arm) avoid the need for QEMU
+    # emulation when cross-building arm64 packages.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.config.outputs.matrix) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts dpkg-dev gnupg python3-yaml
+
+      - name: Build packages (sbuild)
+        run: make debian-sbuild OOS_PACKAGE="${PROJECT}" DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }}
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb_${{ inputs.project }}_${{ matrix.distro }}_${{ matrix.dist }}_${{ matrix.arch }}
+          # Upload all but omit *.build log which has unsupported characters
+          path: |
+            build/${{ inputs.project }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*
+            !build/${{ inputs.project }}/${{ matrix.distro }}-${{ matrix.dist }}-sbuild/*.build
+          if-no-files-found: error
+
+      - name: Upload upstream source for the install test
+        if: matrix.install_test
+        uses: actions/upload-artifact@v4
+        with:
+          name: src_${{ inputs.project }}
+          path: build/${{ inputs.project }}/*.orig.tar.*
+          if-no-files-found: error
+
+  install-test:
+    name: Install test (${{ fromJSON(needs.config.outputs.install_target).distro }}/${{ fromJSON(needs.config.outputs.install_target).dist }}/${{ fromJSON(needs.config.outputs.install_target).arch }})
+    needs: [config, build]
+    runs-on: ${{ fromJSON(needs.config.outputs.install_target).arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    container: ${{ fromJSON(needs.config.outputs.install_target).distro }}:${{ fromJSON(needs.config.outputs.install_target).dist }}
+    env:
+      DISTRO: ${{ fromJSON(needs.config.outputs.install_target).distro }}
+      DIST: ${{ fromJSON(needs.config.outputs.install_target).dist }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: deb_${{ inputs.project }}_${{ fromJSON(needs.config.outputs.install_target).distro }}_${{ fromJSON(needs.config.outputs.install_target).dist }}_${{ fromJSON(needs.config.outputs.install_target).arch }}
+          path: debs
+
+      - name: Download upstream source
+        uses: actions/download-artifact@v4
+        with:
+          name: src_${{ inputs.project }}
+          path: source
+
+      - name: Install and check
+        env:
+          INSTALL_SCRIPT: ${{ needs.config.outputs.install_script }}
+          APT_BASE_URL: ${{ vars.APT_BASE_URL }}
+          PREFIX: ${{ needs.config.outputs.prefix }}
+          KEY: ${{ needs.config.outputs.key }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${INSTALL_SCRIPT}" > "${RUNNER_TEMP}/install-checks.sh"
+          tarballs=(source/*.orig.tar.*)
+          args=(debs "${RUNNER_TEMP}/install-checks.sh" "${tarballs[0]}")
+          if [ -n "${APT_BASE_URL}" ] && [ -f "${KEY}" ]; then
+            args+=("${APT_BASE_URL%/}/apt/${PREFIX}${DISTRO}-${DIST}" "${DIST}" "${KEY}")
+          else
+            echo "::notice::Skipping the upgrade check: it needs the APT_BASE_URL repository variable and ${KEY}"
+          fi
+          ci/install-test "${args[@]}"
+
+  publish:
+    name: Publish to S3 (aptly)
+    if: inputs.publish
+    needs: [config, build, install-test]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.config.outputs.environment }}
+    # One publish per channel at a time: each rewrites the channel's indexes
+    # from what is published when it starts.
+    concurrency:
+      group: publish-${{ inputs.channel }}
+      cancel-in-progress: false
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb_${{ inputs.project }}_*
+          path: artifacts
+
+      - name: Install aptly
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly gnupg
+
+      - name: Import GPG signing key
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: ${{ needs.config.outputs.signing_key }}
+
+      - name: Publish
+        env:
+          PREFIX: ${{ needs.config.outputs.prefix }}
+          SIGNING_KEY: ${{ needs.config.outputs.signing_key }}
+        run: ci/publish-apt --target s3://openocean-build/apt --prefix "${PREFIX}" --gpg-key "${SIGNING_KEY}" artifacts

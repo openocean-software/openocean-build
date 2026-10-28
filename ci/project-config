@@ -5,10 +5,13 @@ Usage:
   project-config list                       JSON list of project names
   project-config <project> get <key.path>   one setting (scalars as text, the rest as JSON)
   project-config <project> matrix [--install-test-only]
-                                            JSON list of build targets for strategy.matrix
+                                            JSON list of build targets for strategy.matrix;
+                                            install_test marks the install-test target
+  project-config <project> install-script   install_test.commands as a bash script
 """
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -62,7 +65,7 @@ def validate(project, config):
         if set(target) != {"distro", "dist"}:
             raise ConfigError(f"{project}: each of targets.dists needs exactly distro and dist, got {target}")
     install = config["install_test"]["target"]
-    if install not in matrix(config):
+    if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")
 
 
@@ -76,14 +79,25 @@ def get(config, key_path):
 
 
 def matrix(config, install_test_only=False):
-    targets = [
-        {"distro": t["distro"], "dist": t["dist"], "arch": arch}
-        for t in config["targets"]["dists"]
-        for arch in config["targets"]["arch"]
-    ]
+    install = config["install_test"]["target"]
+    targets = []
+    for t in config["targets"]["dists"]:
+        for arch in config["targets"]["arch"]:
+            target = {"distro": t["distro"], "dist": t["dist"], "arch": arch}
+            targets.append({**target, "install_test": target == install})
     if install_test_only:
-        targets = [t for t in targets if t == config["install_test"]["target"]]
+        targets = [t for t in targets if t["install_test"]]
     return targets
+
+
+def install_script(config):
+    lines = ["#!/usr/bin/env bash", "set -euxo pipefail"]
+    packages = config["install_test"]["packages"]
+    if packages:
+        # Installed after the packages under test, so they can't satisfy a dependency those forgot.
+        lines.append(shlex.join(["apt-get", "install", "-y", "--no-install-recommends", *packages]))
+    lines += config["install_test"]["commands"]
+    return "\n".join(lines) + "\n"
 
 
 def main(argv):
@@ -96,6 +110,9 @@ def main(argv):
         return
     if len(argv) >= 2 and argv[1] == "matrix" and argv[2:] in ([], ["--install-test-only"]):
         print(json.dumps(matrix(load(argv[0]), install_test_only=bool(argv[2:]))))
+        return
+    if argv[1:] == ["install-script"]:
+        print(install_script(load(argv[0])), end="")
         return
     sys.exit(__doc__)
 

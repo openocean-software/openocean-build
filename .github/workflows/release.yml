@@ -1,0 +1,73 @@
+# Releases a project when its debian/changelog changes on main (i.e. a new
+# release is cut), or on demand for one project. Building and publishing are
+# in build-debian.yml; publishing waits for approval in the channel's GitHub
+# Environment.
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - projects/*/debian/changelog
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project in projects/ to build and publish
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  projects:
+    name: Find projects to release
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.projects.outputs.projects }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List projects
+        id: projects
+        env:
+          REQUESTED: ${{ inputs.project }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF}" != refs/heads/main ]; then
+            echo "::error::Releases are published from main only, not ${GITHUB_REF}"
+            exit 1
+          fi
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+          if [ -n "${REQUESTED}" ]; then
+            projects=("${REQUESTED}")
+          else
+            mapfile -t projects < <(git diff --name-only "${BEFORE}" "${GITHUB_SHA}" -- 'projects/*/debian/changelog' | cut -d/ -f2 | sort -u)
+          fi
+          for project in "${projects[@]}"; do
+            ci/project-config "${project}" get source > /dev/null
+          done
+          echo "projects=$(printf '%s\n' "${projects[@]}" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split()))')" >> "${GITHUB_OUTPUT}"
+
+  release:
+    name: ${{ matrix.project }}
+    needs: projects
+    if: needs.projects.outputs.projects != '[]'
+    strategy:
+      fail-fast: false
+      # GitHub keeps only one pending job per concurrency group, so a third
+      # project waiting to publish would cancel the second.
+      max-parallel: 1
+      matrix:
+        project: ${{ fromJSON(needs.projects.outputs.projects) }}
+    uses: ./.github/workflows/build-debian.yml
+    with:
+      project: ${{ matrix.project }}
+      channel: release
+      publish: true
+    secrets: inherit

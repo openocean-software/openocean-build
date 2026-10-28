@@ -1,0 +1,78 @@
+# Checks pull requests: lints and tests the ci/ scripts, then builds and
+# install-tests each changed project on its install-test target only. Nothing
+# is published.
+name: Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Lint and test ci/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends aptly dpkg-dev gnupg python3-yaml shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck ci/fetch-source ci/install-test
+
+      - name: Check every project's settings
+        run: |
+          set -euo pipefail
+          for project in $(ci/project-config list | python3 -c 'import json, sys; print(*json.load(sys.stdin))'); do
+            ci/project-config "${project}" matrix > /dev/null
+            ci/project-config "${project}" install-script > /dev/null
+          done
+
+      - name: Run tests
+        run: python3 -m unittest discover -s ci/tests -v
+
+  projects:
+    name: Find changed projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.projects.outputs.projects }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List projects
+        id: projects
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+          changed=$(git diff --name-only "${BASE}...HEAD")
+          # A change to the shared build affects every project.
+          if grep -qvE '^(projects/|README\.md$|docs/)' <<< "${changed}"; then
+            projects=$(ci/project-config list)
+          else
+            projects=$({ grep '^projects/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u \
+              | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split()))')
+          fi
+          echo "projects=${projects}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: ${{ matrix.project }}
+    needs: projects
+    if: needs.projects.outputs.projects != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.projects.outputs.projects) }}
+    uses: ./.github/workflows/build-debian.yml
+    with:
+      project: ${{ matrix.project }}
+      all_targets: false
