@@ -1,0 +1,8 @@
+# Who and what the build trusts: a project's maintainers and their keys, the
+# channel signing keys, and the workflows that publish.
+/projects/*/maintainers.yaml @tsaubergine
+/projects/*/keys/ @tsaubergine
+/keys/ @tsaubergine
+/defaults.yaml @tsaubergine
+/ci/ @tsaubergine
+/.github/ @tsaubergine

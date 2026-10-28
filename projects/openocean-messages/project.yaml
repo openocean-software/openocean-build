@@ -1,0 +1,23 @@
+upstream:
+  git: https://github.com/openocean-software/openocean-messages.git
+
+# The release tag, fetched with git and signed by a maintainer.
+source: git
+release:
+  require_signed_tag: true
+  # e.g. v0.1.0-beta.1 (Debian version 0.1.0~beta.1)
+  beta_tags: '^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'
+
+targets:
+  exclude:
+    # protobuf 3.12 needs --experimental_allow_proto3_optional for the
+    # messages' optional fields, which upstream doesn't pass.
+    - { distro: ubuntu, dist: jammy }
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    - python3 -c "from openocean.messages import navigation_pb2; navigation_pb2.Navigation(time=1)"
+    - cmake -S src/test/downstream -B /tmp/downstream -DWITH_CPP=ON -DWITH_PYTHON=ON
+    - cmake --build /tmp/downstream
+    - ctest --test-dir /tmp/downstream --output-on-failure --no-tests=error

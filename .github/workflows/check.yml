@@ -20,7 +20,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends aptly dpkg-dev gnupg python3-yaml shellcheck
+          sudo apt-get install -y --no-install-recommends aptly devscripts dpkg-dev gnupg openssh-client python3-yaml shellcheck
 
       - name: Lint shell scripts
         run: shellcheck ci/fetch-source ci/install-test

@@ -27,8 +27,11 @@ if [ ${#new_debs[@]} -eq 0 ]; then
     exit 1
 fi
 names=()
+declare -A new_versions
 for deb in "${new_debs[@]}"; do
-    names+=("$(dpkg-deb -f "${deb}" Package)")
+    name=$(dpkg-deb -f "${deb}" Package)
+    names+=("${name}")
+    new_versions[${name}]=$(dpkg-deb -f "${deb}" Version)
 done
 
 if [ -n "${repo_url}" ]; then
@@ -46,16 +49,27 @@ if [ -n "${repo_url}" ]; then
             exit 1
         fi
     fi
-    published=()
+    # Only an older published version can be upgraded from. The same version is
+    # a rebuild (e.g. a pull request that doesn't change this project's version).
+    older=()
     for name in "${names[@]}"; do
-        # Only our repository's versions, not a same-named package from the distribution
-        if apt-cache madison "${name}" | grep -qF "${repo_url}"; then
-            published+=("${name}")
+        # Only our repository's version, not a same-named package from the distribution
+        published=$(apt-cache madison "${name}" | awk -F'|' -v url="${repo_url}" 'index($3, url) { gsub(/ /, "", $2); print $2; exit }')
+        new=${new_versions[${name}]}
+        if [ -z "${published}" ]; then
+            continue
+        elif dpkg --compare-versions "${published}" lt "${new}"; then
+            older+=("${name}=${published}")
+        elif dpkg --compare-versions "${published}" gt "${new}"; then
+            echo "${name} ${new} is older than the published ${published}" >&2
+            exit 1
+        else
+            echo "${name} ${new} is already published; not testing an upgrade to it"
         fi
     done
-    if [ ${#published[@]} -gt 0 ]; then
-        echo "Installing the published ${published[*]} before upgrading"
-        apt-get install -y "${published[@]}"
+    if [ ${#older[@]} -gt 0 ]; then
+        echo "Installing the published ${older[*]} before upgrading"
+        apt-get install -y "${older[@]}"
     fi
 fi
 

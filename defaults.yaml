@@ -10,6 +10,9 @@ targets:
     - { distro: ubuntu, dist: noble }
     - { distro: ubuntu, dist: resolute }
 
+# Where users read the channels: CloudFront in front of the bucket's apt/.
+apt_url: https://apt.oceansoft.org
+
 # Each channel is its own apt repository under apt/<prefix><distro>-<dist>
 # in the bucket, published from the named GitHub Environment. It is signed
 # with the (sub)key signing_key, whose public key is in key.
@@ -19,6 +22,24 @@ channels:
     environment: release
     signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
     key: keys/release.asc
+  # Prereleases, chosen per project by release.beta_tags. Users add it next to
+  # release; a prerelease version (~) sorts below its final release.
+  beta:
+    prefix: beta/
+    environment: release
+    signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
+    key: keys/release.asc
+
+upstream:
+  # The upstream tag for a version (Debian "~" becomes "-", +dfsg is dropped)
+  tag_format: "v{version}"
+
+release:
+  # Fetch (source: git) only tags signed by one of projects/<name>/maintainers.yaml.
+  require_signed_tag: false
+  # Regular expression for upstream tags that publish to the beta channel
+  # rather than release; null for none.
+  beta_tags: null
 
 # Where every newly built package is installed before publishing.
 install_test:

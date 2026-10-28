@@ -8,10 +8,14 @@ Usage:
                                             JSON list of build targets for strategy.matrix;
                                             install_test marks the install-test target
   project-config <project> install-script   install_test.commands as a bash script
+  project-config <project> release-tag      upstream tag of the debian/changelog version
+  project-config <project> channel          channel that version publishes to (beta or release)
 """
 
 import json
+import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,7 +23,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 PROJECTS_DIR = ROOT / "projects"
-SOURCES = {"uscan"}
+SOURCES = {"uscan", "git"}
 
 
 class ConfigError(Exception):
@@ -51,19 +55,35 @@ def load(project, root=ROOT):
     if not (project_dir / "debian" / "changelog").is_file():
         raise ConfigError(f"{project}: missing debian/changelog")
     config = merge(load_yaml(root / "defaults.yaml"), load_yaml(project_dir / "project.yaml"))
-    validate(project, config)
+    validate(project, config, root)
     return config
 
 
-def validate(project, config):
+def validate(project, config, root=ROOT):
     if config.get("source") not in SOURCES:
         raise ConfigError(f"{project}: source must be one of {sorted(SOURCES)}, not {config.get('source')!r}")
+    if "{version}" not in str((config.get("upstream") or {}).get("tag_format", "")):
+        raise ConfigError(f"{project}: upstream.tag_format must contain {{version}}")
+    if config["source"] == "git" and not config["upstream"].get("git"):
+        raise ConfigError(f"{project}: source git needs upstream.git")
+    if config["release"].get("beta_tags"):
+        try:
+            re.compile(config["release"]["beta_tags"])
+        except re.error as e:
+            raise ConfigError(f"{project}: release.beta_tags isn't a valid regular expression: {e}")
+        if "beta" not in config["channels"]:
+            raise ConfigError(f"{project}: release.beta_tags needs a beta channel in defaults.yaml")
+    if config.get("release", {}).get("require_signed_tag") and not (root / "projects" / project / "maintainers.yaml").is_file():
+        raise ConfigError(f"{project}: release.require_signed_tag needs projects/{project}/maintainers.yaml")
     targets = config.get("targets", {})
     if not targets.get("arch") or not targets.get("dists"):
         raise ConfigError(f"{project}: targets.arch and targets.dists must not be empty")
     for target in targets["dists"]:
         if set(target) != {"distro", "dist"}:
             raise ConfigError(f"{project}: each of targets.dists needs exactly distro and dist, got {target}")
+    for exclude in targets.get("exclude") or []:
+        if not {"distro", "dist"} <= set(exclude) <= {"distro", "dist", "arch"}:
+            raise ConfigError(f"{project}: each of targets.exclude needs distro and dist (and optionally arch), got {exclude}")
     install = config["install_test"]["target"]
     if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")
@@ -81,9 +101,12 @@ def get(config, key_path):
 def matrix(config, install_test_only=False):
     install = config["install_test"]["target"]
     targets = []
+    excludes = config["targets"].get("exclude") or []
     for t in config["targets"]["dists"]:
         for arch in config["targets"]["arch"]:
             target = {"distro": t["distro"], "dist": t["dist"], "arch": arch}
+            if any(all(target[k] == v for k, v in e.items()) for e in excludes):
+                continue
             targets.append({**target, "install_test": target == install})
     if install_test_only:
         targets = [t for t in targets if t["install_test"]]
@@ -100,19 +123,48 @@ def install_script(config):
     return "\n".join(lines) + "\n"
 
 
+def upstream_version(project, root=ROOT):
+    changelog = root / "projects" / project / "debian" / "changelog"
+    version = subprocess.run(["dpkg-parsechangelog", "-l", str(changelog), "-S", "Version"],
+                             check=True, capture_output=True, text=True).stdout.strip()
+    return version.split(":", 1)[-1].rsplit("-", 1)[0]
+
+
+def release_tag(config, version):
+    """Upstream tags have no repack suffix (+dfsg, +ds), and use "-" where Debian uses "~"."""
+    tag_version = re.sub(r"\+(dfsg|ds)[0-9]*$", "", version).replace("~", "-")
+    return config["upstream"]["tag_format"].replace("{version}", tag_version)
+
+
+def channel(config, version):
+    beta_tags = config["release"].get("beta_tags")
+    if beta_tags and re.search(beta_tags, release_tag(config, version)):
+        return "beta"
+    if "~" in version:
+        # "~" sorts before the release, so it must be a prerelease: never publish it as a release
+        raise ConfigError(f"{version} looks like a prerelease, but its tag doesn't match release.beta_tags")
+    return "release"
+
+
 def main(argv):
     if argv == ["list"]:
         print(json.dumps(list_projects()))
         return
     if len(argv) >= 2 and argv[1] == "get" and len(argv) == 3:
         value = get(load(argv[0]), argv[2])
-        print(value if isinstance(value, (str, int, float)) else json.dumps(value))
+        print(value if isinstance(value, (str, int, float)) and not isinstance(value, bool) else json.dumps(value))
         return
     if len(argv) >= 2 and argv[1] == "matrix" and argv[2:] in ([], ["--install-test-only"]):
         print(json.dumps(matrix(load(argv[0]), install_test_only=bool(argv[2:]))))
         return
     if argv[1:] == ["install-script"]:
         print(install_script(load(argv[0])), end="")
+        return
+    if argv[1:] == ["release-tag"]:
+        print(release_tag(load(argv[0]), upstream_version(argv[0])))
+        return
+    if argv[1:] == ["channel"]:
+        print(channel(load(argv[0]), upstream_version(argv[0])))
         return
     sys.exit(__doc__)
 
