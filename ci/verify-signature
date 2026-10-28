@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Checks that a git tag or commit is signed by one of a project's maintainers.
+
+Usage:
+  verify-signature <project> <git-dir> <ref>
+
+The maintainers and their keys come from projects/<project>/maintainers.yaml,
+with GPG public keys in projects/<project>/keys/*.asc. Only those keys are
+trusted, so a maintainer of one project is trusted on no other. Prints the
+signer and exits 0 if the signature is good; exits 1 otherwise.
+"""
+
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+class VerifyError(Exception):
+    pass
+
+
+def load_maintainers(project, root=ROOT):
+    path = root / "projects" / project / "maintainers.yaml"
+    if not path.is_file():
+        raise VerifyError(f"{project} has no maintainers.yaml, so nothing it signs can be trusted")
+    with open(path) as f:
+        maintainers = (yaml.safe_load(f) or {}).get("maintainers") or []
+    for m in maintainers:
+        if not m.get("name") or not (m.get("gpg") or m.get("ssh")):
+            raise VerifyError(f"{path}: each maintainer needs a name and at least one gpg or ssh key")
+        m["gpg"] = [normalize_fingerprint(f) for f in m.get("gpg") or []]
+        m["ssh"] = list(m.get("ssh") or [])
+    if not maintainers:
+        raise VerifyError(f"{path} lists no maintainers")
+    return maintainers
+
+
+def normalize_fingerprint(fingerprint):
+    fingerprint = str(fingerprint).replace(" ", "").upper()
+    if not re.fullmatch(r"[0-9A-F]{40}|[0-9A-F]{64}", fingerprint):
+        raise VerifyError(f"'{fingerprint}' isn't a full GPG fingerprint")
+    return fingerprint
+
+
+def gpg(gnupghome, *args, **kwargs):
+    return subprocess.run(["gpg", "--homedir", str(gnupghome), "--batch", *args],
+                          capture_output=True, text=True, **kwargs)
+
+
+def make_keyring(project, maintainers, workdir, root=ROOT):
+    """A GPG home holding only the project's keys, with the listed fingerprints trusted."""
+    gnupghome = workdir / "gnupg"
+    gnupghome.mkdir(mode=0o700)
+    wanted = {f for m in maintainers for f in m["gpg"]}
+    if not wanted:
+        return gnupghome
+    for key in sorted((root / "projects" / project / "keys").glob("*.asc")):
+        result = gpg(gnupghome, "--import", str(key))
+        if result.returncode != 0:
+            raise VerifyError(f"can't import {key}:\n{result.stderr}")
+    listed = gpg(gnupghome, "--with-colons", "--list-keys").stdout
+    present = set(re.findall(r"^fpr:+([0-9A-F]+):", listed, re.M))
+    missing = wanted - present
+    if missing:
+        raise VerifyError(f"no key in projects/{project}/keys/ for {', '.join(sorted(missing))}")
+    ownertrust = "".join(f"{f}:6:\n" for f in sorted(wanted))
+    gpg(gnupghome, "--import-ownertrust", input=ownertrust, check=True)
+    return gnupghome
+
+
+def make_allowed_signers(maintainers, workdir):
+    path = workdir / "allowed_signers"
+    lines = []
+    for m in maintainers:
+        principal = m.get("github") or re.sub(r"\s+", "_", m["name"])
+        lines += [f'{principal} namespaces="git" {key}' for key in m["ssh"]]
+    path.write_text("".join(line + "\n" for line in lines))
+    return path
+
+
+def verify(project, git_dir, ref, root=ROOT):
+    maintainers = load_maintainers(project, root)
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        gnupghome = make_keyring(project, maintainers, workdir, root)
+        allowed_signers = make_allowed_signers(maintainers, workdir)
+        kind = subprocess.run(["git", "-C", str(git_dir), "cat-file", "-t", ref],
+                              capture_output=True, text=True).stdout.strip()
+        if kind not in ("tag", "commit"):
+            raise VerifyError(f"{ref} is a {kind or 'missing object'}, not a signed tag or commit")
+        result = subprocess.run(
+            ["git", "-C", str(git_dir), "-c", f"gpg.ssh.allowedSignersFile={allowed_signers}",
+             f"verify-{kind}", "--raw", ref],
+            capture_output=True, text=True,
+            # Only this keyring and these signers, not the caller's git or GPG setup
+            env=dict(os.environ, GNUPGHOME=str(gnupghome), GIT_CONFIG_GLOBAL=os.devnull))
+        output = result.stdout + result.stderr
+        if result.returncode != 0:
+            raise VerifyError(f"{ref} isn't signed by a maintainer of {project}:\n{output}")
+        return signer(maintainers, output, ref, project)
+
+
+def signer(maintainers, output, ref, project):
+    """Names the maintainer whose key made a good signature, from git's --raw output."""
+    if re.search(r"^\[GNUPG:\] (EXPKEYSIG|REVKEYSIG|EXPSIG|BADSIG|ERRSIG)", output, re.M):
+        raise VerifyError(f"{ref}'s signature isn't valid:\n{output}")
+    validsig = re.search(r"^\[GNUPG:\] VALIDSIG (\S+)(?: \S+)* (\S+)$", output, re.M)
+    if validsig:
+        fingerprints = set(validsig.groups())
+        for m in maintainers:
+            if fingerprints & set(m["gpg"]):
+                return m["name"]
+        raise VerifyError(f"{ref} is signed by {validsig.group(1)}, which isn't a maintainer key for {project}")
+    good_ssh = re.search(r'Good "git" signature for (\S+)', output)
+    if good_ssh:
+        for m in maintainers:
+            if good_ssh.group(1) in (m.get("github"), re.sub(r"\s+", "_", m["name"])):
+                return m["name"]
+    raise VerifyError(f"can't tell who signed {ref}:\n{output}")
+
+
+def main(argv):
+    if len(argv) != 3:
+        sys.exit(__doc__)
+    print(f"{argv[2]} is signed by {verify(*argv)}")
+
+
+if __name__ == "__main__":
+    try:
+        main(sys.argv[1:])
+    except VerifyError as e:
+        sys.exit(f"verify-signature: {e}")

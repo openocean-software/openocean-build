@@ -1,0 +1,16 @@
+upstream:
+  git: https://github.com/openocean-software/openocean-messages.git
+  tag_format: "v{version}"
+
+# The release tag, fetched with git and signed by a maintainer.
+source: git
+release:
+  require_signed_tag: true
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    - python3 -c "from openocean.messages import navigation_pb2; navigation_pb2.Navigation(time=1)"
+    - cmake -S src/test/downstream -B /tmp/downstream -DWITH_CPP=ON -DWITH_PYTHON=ON
+    - cmake --build /tmp/downstream
+    - ctest --test-dir /tmp/downstream --output-on-failure --no-tests=error

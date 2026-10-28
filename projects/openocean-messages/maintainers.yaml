@@ -1,0 +1,6 @@
+# People whose signature makes a release tag (and, later, a commit on the
+# default branch) of openocean-messages trusted. GPG public keys are in keys/.
+maintainers:
+  - name: Toby Schneider
+    github: tsaubergine
+    gpg: ["A422 D0D2 1761 C039 62BB  3546 3372 3E2F 080B 6743"]

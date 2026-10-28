@@ -42,6 +42,7 @@ Each project is a directory in `projects/`:
 
 - `project.yaml`: where the source comes from, and any settings that differ from `defaults.yaml` (build targets, install-test checks).
 - `debian/`: the Debian packaging.
+- `maintainers.yaml` and `keys/` (for `source: git` with `require_signed_tag`): the people whose signed release tags are trusted, and their GPG public keys or SSH keys. Only these keys are trusted for this project.
 
 `ci/project-config <project> get <setting>` shows the merged settings. To build locally, see the top of the `Makefile`.
 

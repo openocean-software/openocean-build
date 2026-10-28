@@ -1,0 +1,4 @@
+usr/include
+usr/lib/*/libopenocean_messages.so
+usr/lib/*/cmake
+usr/share/openocean_messages

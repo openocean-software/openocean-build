@@ -8,23 +8,47 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 project=${1:?usage: fetch-source <project> <destdir>}
 destdir=${2:?usage: fetch-source <project> <destdir>}
+config="${root}/ci/project-config"
+project_dir="${root}/projects/${project}"
 
-mkdir -p "${destdir}"
-case "$("${root}/ci/project-config" "${project}" get source)" in
-    uscan)
-        # uscan fetches the newest upstream release; pinning a version with
-        # --download-version or --download-current-version doesn't match
-        # releases renamed by uversionmangle (e.g. +dfsg) on every devscripts
-        # version, so check afterwards that it fetched the changelog's.
-        uscan --destdir="${destdir}" --verbose "${root}/projects/${project}"
-        ;;
-esac
-
-changelog="${root}/projects/${project}/debian/changelog"
+changelog="${project_dir}/debian/changelog"
 source=$(dpkg-parsechangelog -l "${changelog}" -S Source)
 version=$(dpkg-parsechangelog -l "${changelog}" -S Version)
 upstream_version=${version#*:}
 upstream_version=${upstream_version%-*}
+
+mkdir -p "${destdir}"
+case "$("${config}" "${project}" get source)" in
+    uscan)
+        # uscan fetches the newest upstream release; pinning a version with
+        # --download-version or --download-current-version doesn't match
+        # releases renamed by uversionmangle (e.g. +dfsg) on every devscripts
+        # version, so the check below catches a newer upstream release.
+        uscan --destdir="${destdir}" --verbose "${project_dir}"
+        ;;
+    git)
+        # Upstream tags have no repack suffix (+dfsg, +ds), and use "-" where
+        # Debian uses "~" (which sorts before the release).
+        tag_version=$(sed -E 's/\+(dfsg|ds)[0-9]*$//; s/~/-/g' <<< "${upstream_version}")
+        tag_format=$("${config}" "${project}" get upstream.tag_format)
+        tag=${tag_format//\{version\}/${tag_version}}
+        work=$(mktemp -d)
+        trap 'rm -rf "${work}"' EXIT
+        git init -q "${work}/repo"
+        git -C "${work}/repo" fetch -q --depth 1 "$("${config}" "${project}" get upstream.git)" \
+            "refs/tags/${tag}:refs/tags/${tag}"
+        if [ "$("${config}" "${project}" get release.require_signed_tag)" = true ]; then
+            "${root}/ci/verify-signature" "${project}" "${work}/repo" "refs/tags/${tag}"
+        fi
+        git -C "${work}/repo" archive --format=tar --prefix="${source}-${upstream_version}/" "refs/tags/${tag}" \
+            | gzip -n > "${work}/${source}-${upstream_version}.tar.gz"
+        # mk-origtargz applies debian/copyright's Files-Excluded, as uscan does.
+        mk-origtargz --package "${source}" --version "${upstream_version}" --compression gzip --copy \
+            --copyright-file "${project_dir}/debian/copyright" --directory "${destdir}" \
+            "${work}/${source}-${upstream_version}.tar.gz"
+        ;;
+esac
+
 shopt -s nullglob
 orig=("${destdir}/${source}_${upstream_version}".orig.tar.*)
 if [ ${#orig[@]} -eq 0 ]; then

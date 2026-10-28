@@ -20,6 +20,10 @@ channels:
     signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
     key: keys/release.asc
 
+release:
+  # Fetch (source: git) only tags signed by one of projects/<name>/maintainers.yaml.
+  require_signed_tag: false
+
 # Where every newly built package is installed before publishing.
 install_test:
   target: { distro: ubuntu, dist: resolute, arch: amd64 }

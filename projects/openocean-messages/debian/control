@@ -1,0 +1,54 @@
+Source: openocean-messages
+Section: libs
+Priority: optional
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               dh-sequence-python3,
+               cmake,
+               libprotobuf-dev,
+               protobuf-compiler,
+               python3,
+               pkgconf <!nocheck>,
+               libudunits2-dev <!nocheck>,
+               python3-protobuf <!nocheck>
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/openocean-software/openocean-messages
+Vcs-Git: https://github.com/openocean-software/openocean-messages.git
+Vcs-Browser: https://github.com/openocean-software/openocean-messages
+
+Package: libopenocean-messages1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: common messages for marine robotic systems (C++ library)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the shared library of the C++ Protobuf messages.
+
+Package: libopenocean-messages-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libopenocean-messages1 (= ${binary:Version}),
+         libprotobuf-dev,
+         protobuf-compiler,
+         ${misc:Depends}
+Recommends: python3
+Description: common messages for marine robotic systems (development files)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the C++ headers, the .proto files, the CMake package
+ (find_package(openocean_messages)), and the ROS 2 and LCM generators.
+
+Package: python3-openocean-messages
+Section: python
+Architecture: all
+Depends: python3-protobuf, ${python3:Depends}, ${misc:Depends}
+Description: common messages for marine robotic systems (Python modules)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the Python Protobuf modules (openocean.messages).
