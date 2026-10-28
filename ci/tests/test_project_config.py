@@ -27,6 +27,12 @@ targets:
     - { distro: ubuntu, dist: resolute }
 channels:
   release: { prefix: release/, environment: release }
+  beta: { prefix: beta/, environment: release }
+upstream:
+  tag_format: "v{version}"
+release:
+  require_signed_tag: false
+  beta_tags: null
 install_test:
   target: { distro: ubuntu, dist: resolute, arch: amd64 }
   packages: []
@@ -134,7 +140,47 @@ class ProjectConfigTest(unittest.TestCase):
         config = self.load(self.project("p", "source: uscan\n"))
         self.assertEqual(project_config.get(config, "channels.release.environment"), "release")
         with self.assertRaisesRegex(project_config.ConfigError, "no setting"):
-            project_config.get(config, "channels.beta.prefix")
+            project_config.get(config, "channels.continuous.prefix")
+
+    def test_release_tag_maps_debian_versions_to_upstream_tags(self):
+        config = self.load(self.project("p", "source: uscan\n"))
+        for version, tag in [("1.2.0", "v1.2.0"), ("24.8.1+dfsg", "v24.8.1"), ("1.2.0+ds1", "v1.2.0"),
+                             ("0.1.0~beta.1", "v0.1.0-beta.1"), ("2.0.0~rc.2+dfsg", "v2.0.0-rc.2")]:
+            with self.subTest(version=version):
+                self.assertEqual(project_config.release_tag(config, version), tag)
+
+    def test_tag_format_is_per_project(self):
+        config = self.load(self.project("p", 'source: uscan\nupstream:\n  tag_format: "release-{version}"\n'))
+        self.assertEqual(project_config.release_tag(config, "3.1"), "release-3.1")
+
+    def test_channel_is_beta_only_for_matching_tags(self):
+        config = self.load(self.project("p", """
+            source: uscan
+            release:
+              beta_tags: '^v[0-9.]+-(beta|rc)\\.[0-9]+$'
+            """))
+        self.assertEqual(project_config.channel(config, "0.1.0~beta.1"), "beta")
+        self.assertEqual(project_config.channel(config, "0.1.0~rc.2"), "beta")
+        self.assertEqual(project_config.channel(config, "0.1.0"), "release")
+
+    def test_prerelease_without_beta_tags_is_refused(self):
+        config = self.load(self.project("p", "source: uscan\n"))
+        with self.assertRaisesRegex(project_config.ConfigError, "prerelease"):
+            project_config.channel(config, "0.1.0~beta.1")
+
+    def test_prerelease_not_matching_beta_tags_is_refused(self):
+        config = self.load(self.project("p", """
+            source: uscan
+            release:
+              beta_tags: '-rc\\.[0-9]+$'
+            """))
+        with self.assertRaisesRegex(project_config.ConfigError, "prerelease"):
+            project_config.channel(config, "0.1.0~alpha.1")
+
+    def test_beta_tags_needs_a_beta_channel(self):
+        (self.root / "defaults.yaml").write_text(DEFAULTS.replace("  beta: { prefix: beta/, environment: release }\n", ""))
+        with self.assertRaisesRegex(project_config.ConfigError, "beta channel"):
+            self.load(self.project("p", "source: uscan\nrelease:\n  beta_tags: beta\n"))
 
     def test_every_real_project_loads(self):
         for name in project_config.list_projects():

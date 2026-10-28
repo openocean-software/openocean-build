@@ -1,11 +1,12 @@
 upstream:
   git: https://github.com/openocean-software/openocean-messages.git
-  tag_format: "v{version}"
 
 # The release tag, fetched with git and signed by a maintainer.
 source: git
 release:
   require_signed_tag: true
+  # e.g. v0.1.0-beta.1 (Debian version 0.1.0~beta.1)
+  beta_tags: '^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'
 
 targets:
   exclude:

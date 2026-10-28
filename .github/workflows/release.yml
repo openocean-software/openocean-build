@@ -1,6 +1,8 @@
 # Releases a project when its debian/changelog changes on main (i.e. a new
-# release is cut), or on demand for one project. Building and publishing are
-# in build-debian.yml; publishing waits for approval in the channel's GitHub
+# release is cut), or on demand for one project. The changelog version's
+# upstream tag picks the channel: beta if it matches the project's
+# release.beta_tags, otherwise release. Building and publishing are in
+# build-debian.yml; publishing waits for approval in the channel's GitHub
 # Environment.
 name: Release
 
@@ -25,7 +27,7 @@ jobs:
     name: Find projects to release
     runs-on: ubuntu-latest
     outputs:
-      projects: ${{ steps.projects.outputs.projects }}
+      releases: ${{ steps.projects.outputs.releases }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -43,31 +45,40 @@ jobs:
             echo "::error::Releases are published from main only, not ${GITHUB_REF}"
             exit 1
           fi
-          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+          if ! python3 -c 'import yaml' 2>/dev/null || ! command -v dpkg-parsechangelog > /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-yaml dpkg-dev
+          fi
           if [ -n "${REQUESTED}" ]; then
             projects=("${REQUESTED}")
           else
             mapfile -t projects < <(git diff --name-only "${BEFORE}" "${GITHUB_SHA}" -- 'projects/*/debian/changelog' | cut -d/ -f2 | sort -u)
           fi
+          # Each project's channel comes from its changelog version's upstream tag.
+          releases=()
           for project in "${projects[@]}"; do
-            ci/project-config "${project}" get source > /dev/null
+            channel=$(ci/project-config "${project}" channel)
+            echo "${project} $(ci/project-config "${project}" release-tag) -> ${channel}"
+            releases+=("${project}:${channel}")
           done
-          echo "projects=$(printf '%s\n' "${projects[@]}" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split()))')" >> "${GITHUB_OUTPUT}"
+          echo "releases=$(printf '%s\n' "${releases[@]}" | python3 -c '
+          import json, sys
+          print(json.dumps([dict(zip(("project", "channel"), r.split(":"))) for r in sys.stdin.read().split()]))
+          ')" >> "${GITHUB_OUTPUT}"
 
   release:
-    name: ${{ matrix.project }}
+    name: ${{ matrix.project }} (${{ matrix.channel }})
     needs: projects
-    if: needs.projects.outputs.projects != '[]'
+    if: needs.projects.outputs.releases != '[]'
     strategy:
       fail-fast: false
       # GitHub keeps only one pending job per concurrency group, so a third
       # project waiting to publish would cancel the second.
       max-parallel: 1
       matrix:
-        project: ${{ fromJSON(needs.projects.outputs.projects) }}
+        include: ${{ fromJSON(needs.projects.outputs.releases) }}
     uses: ./.github/workflows/build-debian.yml
     with:
       project: ${{ matrix.project }}
-      channel: release
+      channel: ${{ matrix.channel }}
       publish: true
     secrets: inherit

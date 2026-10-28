@@ -27,11 +27,7 @@ case "$("${config}" "${project}" get source)" in
         uscan --destdir="${destdir}" --verbose "${project_dir}"
         ;;
     git)
-        # Upstream tags have no repack suffix (+dfsg, +ds), and use "-" where
-        # Debian uses "~" (which sorts before the release).
-        tag_version=$(sed -E 's/\+(dfsg|ds)[0-9]*$//; s/~/-/g' <<< "${upstream_version}")
-        tag_format=$("${config}" "${project}" get upstream.tag_format)
-        tag=${tag_format//\{version\}/${tag_version}}
+        tag=$("${config}" "${project}" release-tag)
         work=$(mktemp -d)
         trap 'rm -rf "${work}"' EXIT
         git init -q "${work}/repo"

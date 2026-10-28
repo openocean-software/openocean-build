@@ -8,10 +8,14 @@ Usage:
                                             JSON list of build targets for strategy.matrix;
                                             install_test marks the install-test target
   project-config <project> install-script   install_test.commands as a bash script
+  project-config <project> release-tag      upstream tag of the debian/changelog version
+  project-config <project> channel          channel that version publishes to (beta or release)
 """
 
 import json
+import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -58,10 +62,17 @@ def load(project, root=ROOT):
 def validate(project, config, root=ROOT):
     if config.get("source") not in SOURCES:
         raise ConfigError(f"{project}: source must be one of {sorted(SOURCES)}, not {config.get('source')!r}")
-    if config["source"] == "git":
-        upstream = config.get("upstream") or {}
-        if not upstream.get("git") or "{version}" not in str(upstream.get("tag_format", "")):
-            raise ConfigError(f"{project}: source git needs upstream.git and upstream.tag_format containing {{version}}")
+    if "{version}" not in str((config.get("upstream") or {}).get("tag_format", "")):
+        raise ConfigError(f"{project}: upstream.tag_format must contain {{version}}")
+    if config["source"] == "git" and not config["upstream"].get("git"):
+        raise ConfigError(f"{project}: source git needs upstream.git")
+    if config["release"].get("beta_tags"):
+        try:
+            re.compile(config["release"]["beta_tags"])
+        except re.error as e:
+            raise ConfigError(f"{project}: release.beta_tags isn't a valid regular expression: {e}")
+        if "beta" not in config["channels"]:
+            raise ConfigError(f"{project}: release.beta_tags needs a beta channel in defaults.yaml")
     if config.get("release", {}).get("require_signed_tag") and not (root / "projects" / project / "maintainers.yaml").is_file():
         raise ConfigError(f"{project}: release.require_signed_tag needs projects/{project}/maintainers.yaml")
     targets = config.get("targets", {})
@@ -112,6 +123,29 @@ def install_script(config):
     return "\n".join(lines) + "\n"
 
 
+def upstream_version(project, root=ROOT):
+    changelog = root / "projects" / project / "debian" / "changelog"
+    version = subprocess.run(["dpkg-parsechangelog", "-l", str(changelog), "-S", "Version"],
+                             check=True, capture_output=True, text=True).stdout.strip()
+    return version.split(":", 1)[-1].rsplit("-", 1)[0]
+
+
+def release_tag(config, version):
+    """Upstream tags have no repack suffix (+dfsg, +ds), and use "-" where Debian uses "~"."""
+    tag_version = re.sub(r"\+(dfsg|ds)[0-9]*$", "", version).replace("~", "-")
+    return config["upstream"]["tag_format"].replace("{version}", tag_version)
+
+
+def channel(config, version):
+    beta_tags = config["release"].get("beta_tags")
+    if beta_tags and re.search(beta_tags, release_tag(config, version)):
+        return "beta"
+    if "~" in version:
+        # "~" sorts before the release, so it must be a prerelease: never publish it as a release
+        raise ConfigError(f"{version} looks like a prerelease, but its tag doesn't match release.beta_tags")
+    return "release"
+
+
 def main(argv):
     if argv == ["list"]:
         print(json.dumps(list_projects()))
@@ -125,6 +159,12 @@ def main(argv):
         return
     if argv[1:] == ["install-script"]:
         print(install_script(load(argv[0])), end="")
+        return
+    if argv[1:] == ["release-tag"]:
+        print(release_tag(load(argv[0]), upstream_version(argv[0])))
+        return
+    if argv[1:] == ["channel"]:
+        print(channel(load(argv[0]), upstream_version(argv[0])))
         return
     sys.exit(__doc__)
 
