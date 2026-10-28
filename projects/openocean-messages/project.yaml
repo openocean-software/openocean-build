@@ -7,6 +7,12 @@ source: git
 release:
   require_signed_tag: true
 
+targets:
+  exclude:
+    # protobuf 3.12 needs --experimental_allow_proto3_optional for the
+    # messages' optional fields, which upstream doesn't pass.
+    - { distro: ubuntu, dist: jammy }
+
 install_test:
   packages: [cmake, g++, make]
   commands:

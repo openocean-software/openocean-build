@@ -70,6 +70,9 @@ def validate(project, config, root=ROOT):
     for target in targets["dists"]:
         if set(target) != {"distro", "dist"}:
             raise ConfigError(f"{project}: each of targets.dists needs exactly distro and dist, got {target}")
+    for exclude in targets.get("exclude") or []:
+        if not {"distro", "dist"} <= set(exclude) <= {"distro", "dist", "arch"}:
+            raise ConfigError(f"{project}: each of targets.exclude needs distro and dist (and optionally arch), got {exclude}")
     install = config["install_test"]["target"]
     if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")
@@ -87,9 +90,12 @@ def get(config, key_path):
 def matrix(config, install_test_only=False):
     install = config["install_test"]["target"]
     targets = []
+    excludes = config["targets"].get("exclude") or []
     for t in config["targets"]["dists"]:
         for arch in config["targets"]["arch"]:
             target = {"distro": t["distro"], "dist": t["dist"], "arch": arch}
+            if any(all(target[k] == v for k, v in e.items()) for e in excludes):
+                continue
             targets.append({**target, "install_test": target == install})
     if install_test_only:
         targets = [t for t in targets if t["install_test"]]

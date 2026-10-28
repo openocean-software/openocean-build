@@ -79,6 +79,17 @@ class ProjectConfigTest(unittest.TestCase):
         self.assertEqual(project_config.matrix(config, install_test_only=True),
                          [t for t in targets if t["install_test"]])
 
+    def test_excluded_targets_are_not_built(self):
+        config = self.load(self.project("p", """
+            source: uscan
+            targets:
+              exclude:
+                - { distro: debian, dist: trixie }
+                - { distro: ubuntu, dist: resolute, arch: arm64 }
+            """))
+        self.assertEqual([(t["dist"], t["arch"]) for t in project_config.matrix(config)],
+                         [("resolute", "amd64")])
+
     def test_install_test_target_must_be_built(self):
         with self.assertRaisesRegex(project_config.ConfigError, "install_test.target"):
             self.load(self.project("p", """
@@ -86,6 +97,15 @@ class ProjectConfigTest(unittest.TestCase):
                 targets:
                   dists:
                     - { distro: debian, dist: trixie }
+                """))
+
+    def test_excluding_the_install_test_target_is_rejected(self):
+        with self.assertRaisesRegex(project_config.ConfigError, "install_test.target"):
+            self.load(self.project("p", """
+                source: uscan
+                targets:
+                  exclude:
+                    - { distro: ubuntu, dist: resolute }
                 """))
 
     def test_unknown_source_is_rejected(self):
