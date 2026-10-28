@@ -4,11 +4,11 @@ Upstream-Contact: Open Ocean Software <https://oceansoft.org>
 Source: https://github.com/openocean-software/openocean-messages
 
 Files: *
-Copyright: 2026 The openocean-messages contributors
+Copyright: 2026 Open Ocean Software contributors
 License: Apache-2.0
 
 Files: debian/*
-Copyright: 2026 Open Ocean Software
+Copyright: 2026 Open Ocean Software contributors
 License: Apache-2.0
 
 License: Apache-2.0
