@@ -2,7 +2,9 @@
 # local testing only -- resulting packages are left unsigned (-uc -us)
 # unless SIGN_KEY is set (see below).
 #
-# All commands require OOS_PACKAGE to be set, e.g. "export OOS_PACKAGE=moos-ivp"
+# All commands require OOS_PACKAGE to be set to a project in projects/,
+# e.g. "export OOS_PACKAGE=moos-ivp". Fetching the source needs
+# python3-yaml and devscripts on the host (see ci/fetch-source).
 #
 #   make debian                          # quick build: throwaway container,
 #                                        # deps via mk-build-deps; drops to a
@@ -20,7 +22,7 @@
 #                                        # present, and unlocked/usable
 #                                        # non-interactively, in the
 #                                        # invoking user's keyring -- see
-#                                        # build-moos-ivp.yml for how CI
+#                                        # build-debian.yml for how CI
 #                                        # provisions one)
 #   make clean                           # remove fetched source / build
 #                                        # products
@@ -33,13 +35,20 @@ ifndef OOS_PACKAGE
 $(error OOS_PACKAGE is not set. Please run: export OOS_PACKAGE=<package name>)
 endif
 
+PROJECT_DIR   := projects/$(OOS_PACKAGE)
+DEBIAN_DIR    := $(PROJECT_DIR)/debian
+
+ifeq ($(wildcard $(PROJECT_DIR)/project.yaml),)
+$(error No project '$(OOS_PACKAGE)': expected $(PROJECT_DIR)/project.yaml)
+endif
+
 # DISTRO selects the .deb-based distribution family to build against; it is
 # also the Docker Hub repository the base image is pulled from (debian/ubuntu).
 DISTRO        ?= debian
 
 ifeq ($(DISTRO),debian)
 # Debian has a single rolling target, so take it from debian/changelog.
-DIST          := $(shell dpkg-parsechangelog -l $(OOS_PACKAGE)/debian/changelog -S Distribution)
+DIST          := $(shell dpkg-parsechangelog -l $(DEBIAN_DIR)/changelog -S Distribution)
 else ifeq ($(DISTRO),ubuntu)
 # Ubuntu has no equivalent field (the changelog's Distribution is always a
 # Debian codename), so default to the current LTS and let it be overridden.
@@ -48,7 +57,7 @@ else
 $(error Unsupported DISTRO '$(DISTRO)'. Supported values: debian, ubuntu)
 endif
 
-DEB_VERSION   := $(shell dpkg-parsechangelog -l $(OOS_PACKAGE)/debian/changelog -S Version)
+DEB_VERSION   := $(shell dpkg-parsechangelog -l $(DEBIAN_DIR)/changelog -S Version)
 UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | sed -E 's/-[^-]+$$//')
 
 ARCH          := amd64
@@ -72,11 +81,12 @@ SRC_DIR       := $(BUILD_DIR)/$(OOS_PACKAGE)-$(UPSTREAM_VERSION)
 ORIG_TARBALL  := $(BUILD_DIR)/$(OOS_PACKAGE)_$(UPSTREAM_VERSION).orig.tar.gz
 DSC_FILE      := $(BUILD_DIR)/$(OOS_PACKAGE)_$(DEB_VERSION).dsc
 
-DEBIAN_SBUILD_DOCKER_IMAGE := $(OOS_PACKAGE)-sbuild:$(DISTRO)-$(DIST)
+# Images don't depend on the project, so every project shares them.
+DEBIAN_SBUILD_DOCKER_IMAGE := oos-sbuild:$(DISTRO)-$(DIST)-$(ARCH)
 DEBIAN_SBUILD_DOCKER_DIR   := docker/debian/sbuild
 DEBIAN_SBUILD_CHROOT       := $(DIST)-$(ARCH)-sbuild
 
-DEBIAN_DOCKER_IMAGE := $(OOS_PACKAGE)-simple:$(DISTRO)-$(DIST)
+DEBIAN_DOCKER_IMAGE := oos-simple:$(DISTRO)-$(DIST)
 DEBIAN_DOCKER_DIR   := docker/debian/simple
 # dpkg-buildpackage drops its .deb/.changes/.buildinfo directly into the
 # parent of the source directory it's invoked from, so this scratch dir
@@ -98,7 +108,7 @@ debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(DEBIAN_BUILD_DIR)
 	mkdir -p $(DEBIAN_BUILD_DIR)
 	rm -rf $(SRC_DIR)/debian
-	cp -a $(OOS_PACKAGE)/debian $(SRC_DIR)/
+	cp -a $(DEBIAN_DIR) $(SRC_DIR)/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
 	docker run --rm -it \
 		-v $(DEBIAN_BUILD_DIR):/build \
@@ -165,14 +175,13 @@ debian-sbuild-docker-image: $(DEBIAN_SBUILD_DOCKER_DIR)/Dockerfile
 		--build-arg UID=$(UID) --build-arg GID=$(GID) \
 		-t $(DEBIAN_SBUILD_DOCKER_IMAGE) $(DEBIAN_SBUILD_DOCKER_DIR)
 
-# Fetches the upstream release matching debian/watch and repacks it as the
-# .orig tarball expected by dpkg-source, applying debian/copyright's
-# Files-Excluded (strips the bundled non-DFSG-free proj-5.2.0 copy).
+# Fetches the upstream source the way the project's project.yaml says, as
+# the .orig tarball expected by dpkg-source (with uscan, applying
+# debian/copyright's Files-Excluded).
 source: $(ORIG_TARBALL)
 
 $(ORIG_TARBALL):
-	mkdir -p $(BUILD_DIR)
-	uscan --destdir=$(BUILD_DIR) --verbose $(OOS_PACKAGE)
+	ci/fetch-source $(OOS_PACKAGE) $(BUILD_DIR)
 
 # uscan only produces the orig tarball; unpack it into the source
 # directory dpkg-source expects. The extracted top-level directory name
@@ -185,9 +194,9 @@ $(SRC_DIR): $(ORIG_TARBALL)
 	mv $(BUILD_DIR)/.extract/* $(SRC_DIR)
 	rmdir $(BUILD_DIR)/.extract
 
-$(DSC_FILE): $(SRC_DIR) $(shell find $(OOS_PACKAGE)/debian -type f)
+$(DSC_FILE): $(SRC_DIR) $(shell find $(DEBIAN_DIR) -type f)
 	rm -rf $(SRC_DIR)/debian
-	cp -a $(OOS_PACKAGE)/debian $(SRC_DIR)/
+	cp -a $(DEBIAN_DIR) $(SRC_DIR)/
 	cd $(BUILD_DIR) && dpkg-source -b $(notdir $(SRC_DIR))
 
 clean:

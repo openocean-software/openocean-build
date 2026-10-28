@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Fetches the upstream source for the version in a project's debian/changelog
+# and leaves it in <destdir> as the .orig tarball dpkg-source expects.
+#
+# Usage: fetch-source <project> <destdir>
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+project=${1:?usage: fetch-source <project> <destdir>}
+destdir=${2:?usage: fetch-source <project> <destdir>}
+
+mkdir -p "${destdir}"
+case "$("${root}/ci/project-config" "${project}" get source)" in
+    uscan)
+        # Without --download-current-version uscan fetches the newest
+        # upstream release, which may not be the one the changelog names.
+        uscan --destdir="${destdir}" --download-current-version --verbose "${root}/projects/${project}"
+        ;;
+esac

@@ -1,0 +1,11 @@
+upstream:
+  git: https://github.com/moos-ivp/moos-ivp.git
+
+# Upstream release tarballs via debian/watch, repacked to drop the bundled proj.
+source: uscan
+
+install_test:
+  commands:
+    - command -v MOOSDB
+    - command -v pHelmIvP
+    - test -s /usr/share/ivp/missions.tgz
