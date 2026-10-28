@@ -36,6 +36,8 @@ Section: libdevel
 Multi-Arch: same
 Depends: libmoos10-mit (=${binary:Version}),
          ${misc:Depends}
+Breaks: libmoos-ivp-dev (<< 24.8.1+dfsg-3)
+Replaces: libmoos-ivp-dev (<< 24.8.1+dfsg-3)
 Description: Cross Platform Software for Robotics Research. 
  From An Overview of MOOS-IvP and a Users Guide to the IvP Helm Autonomy Software (http://hdl.handle.net/1721.1/57583): MOOS is often described as autonomy "middleware" which can be argued is shorthand for the glue that connects a collection of applications where the "real" work is going on. MOOS does indeed connect a collection of applications.... 
  However, each application inherits a generic MOOS interface whose implementation provides a powerful, easy-to-use means of communicating with other applications and controlling the relative frequency at which the application executes its primary set of functions. Due to its combination of ease-of-use, general extendability and reliability, it has been used in the classroom by students with no prior experience, as well on many extended field exercises with substantial robotic resources at stake. 
@@ -85,6 +87,7 @@ Package: libmoos-ivp-dev
 Section: libdevel
 Architecture: any
 Depends: libmoos-ivp (= ${binary:Version}),
+         libmoos10-mit-dev (= ${binary:Version}),
 	 libxinerama-dev,
          freeglut3-dev | libglut3-dev,
          libx11-dev,
@@ -94,6 +97,8 @@ Depends: libmoos-ivp (= ${binary:Version}),
          fluid,
          libproj-dev,
          ${misc:Depends}
+Breaks: libmoos10-mit-dev (<< 24.8.1+dfsg-3)
+Replaces: libmoos10-mit-dev (<< 24.8.1+dfsg-3)
 Description: Developers' package for the libraries included with the MOOS-IvP multi-objective decision engine (and related tools) for autonomous marine vehicles.
  MOOS-IvP includes software for high-level control (decision-making) on robotic platforms (primarily marine). IvP stands for "Interval Programming" which is a mathematical programming model for multi-objective optimization. In the IvP model each objective function is a piecewise linear construct where each piece is an interval in N-Space.  The IvP model and algorithms are included in the IvP Helm software as the method for representing and reconciling the output of helm behaviors. 
  This package provides the developer headers for the libraries in MOOS-IvP.
