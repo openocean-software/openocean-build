@@ -20,7 +20,7 @@
 #
 # The install test also tests upgrading from the packages already published,
 # once the APT_BASE_URL repository variable is set to where the bucket is
-# served (e.g. https://openocean-build.s3.amazonaws.com) and the channel's
+# served (https://openocean-build.s3.us-east-1.amazonaws.com) and the channel's
 # public key is committed at its key path in defaults.yaml.
 name: Build Debian packages
 

@@ -26,15 +26,13 @@ Packages are published per channel at `apt/<channel>/<distro>-<dist>`. For examp
 
 ```
 Types: deb
-URIs: <APT_BASE_URL>/apt/release/debian-trixie
+URIs: https://openocean-build.s3.us-east-1.amazonaws.com/apt/release/debian-trixie
 Suites: trixie
 Components: main
 Signed-By: /usr/share/keyrings/openocean-release.asc
 ```
 
 The release channel is signed with the key in [`keys/release.asc`](keys/release.asc) (fingerprint `EAD2 78F6 A256 44C2 C559  DBB6 D28A 2EAB 14D2 A9E5`). Save it as `/usr/share/keyrings/openocean-release.asc`.
-
-TODO: the public URL for `<APT_BASE_URL>`.
 
 ## Adding a project
 
