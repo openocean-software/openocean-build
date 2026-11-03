@@ -41,6 +41,14 @@ on:
         description: Build every target, rather than only the install-test target
         type: boolean
         default: true
+      source_ref:
+        description: Upstream commit to build instead of the changelog version's release tag (source git only)
+        type: string
+        default: ""
+      version:
+        description: Debian version to build source_ref as, added to a copy of the changelog
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -65,6 +73,7 @@ jobs:
       signing_key: ${{ steps.config.outputs.signing_key }}
       key: ${{ steps.config.outputs.key }}
       apt_url: ${{ steps.config.outputs.apt_url }}
+      keep: ${{ steps.config.outputs.keep }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -86,6 +95,7 @@ jobs:
             for setting in prefix environment signing_key key; do
               echo "${setting}=$(ci/project-config "${PROJECT}" get "channels.${CHANNEL}.${setting}")"
             done
+            echo "keep=$(ci/project-config "${PROJECT}" get "channels.${CHANNEL}.keep" 2>/dev/null || true)"
             echo "install_script<<INSTALL_SCRIPT_EOF"
             ci/project-config "${PROJECT}" install-script
             echo "INSTALL_SCRIPT_EOF"
@@ -111,7 +121,18 @@ jobs:
           sudo apt-get install -y --no-install-recommends devscripts dpkg-dev gnupg python3-yaml
 
       - name: Build packages (sbuild)
-        run: make debian-sbuild OOS_PACKAGE="${PROJECT}" DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }}
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "${SOURCE_REF}" ]; then
+            ci/stage-debian "${PROJECT}" "${VERSION}" "${RUNNER_TEMP}/staged" \
+              "Continuous build of ${PROJECT} ${SOURCE_REF:0:7}."
+            args+=(DEBIAN_DIR="${RUNNER_TEMP}/staged/debian" SOURCE_REF="${SOURCE_REF}")
+          fi
+          make debian-sbuild OOS_PACKAGE="${PROJECT}" DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} "${args[@]}"
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
@@ -215,4 +236,9 @@ jobs:
         env:
           PREFIX: ${{ needs.config.outputs.prefix }}
           SIGNING_KEY: ${{ needs.config.outputs.signing_key }}
-        run: ci/publish-apt --target s3://openocean-build/apt --prefix "${PREFIX}" --gpg-key "${SIGNING_KEY}" artifacts
+          KEEP: ${{ needs.config.outputs.keep }}
+        run: |
+          set -euo pipefail
+          args=()
+          [ -z "${KEEP}" ] || args+=(--keep "${KEEP}")
+          ci/publish-apt --target s3://openocean-build/apt --prefix "${PREFIX}" --gpg-key "${SIGNING_KEY}" "${args[@]}" artifacts

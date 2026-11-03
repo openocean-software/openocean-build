@@ -182,6 +182,12 @@ class ProjectConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(project_config.ConfigError, "beta channel"):
             self.load(self.project("p", "source: uscan\nrelease:\n  beta_tags: beta\n"))
 
+    def test_tag_version_reverses_release_tag(self):
+        config = self.load(self.project("p", "source: uscan\n"))
+        for tag, version in [("v1.2.0", "1.2.0"), ("v0.0.1-beta.1", "0.0.1~beta.1"), ("other-1.0", None)]:
+            with self.subTest(tag=tag):
+                self.assertEqual(project_config.tag_version(config, tag), version)
+
     def test_every_real_project_loads(self):
         for name in project_config.list_projects():
             with self.subTest(project=name):

@@ -2,23 +2,42 @@
 # Fetches the upstream source for the version in a project's debian/changelog
 # and leaves it in <destdir> as the .orig tarball dpkg-source expects.
 #
-# Usage: fetch-source <project> <destdir>
+# Usage: fetch-source [--debian-dir <dir>] [--ref <commit>] <project> <destdir>
+#   --debian-dir  read the version from <dir>/changelog (e.g. from stage-debian)
+#   --ref         (source: git) fetch this commit instead of the release tag.
+#                 Its signature isn't checked here: whoever picks the commit
+#                 must have verified it (see continuous.yml).
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-project=${1:?usage: fetch-source <project> <destdir>}
-destdir=${2:?usage: fetch-source <project> <destdir>}
+debian_dir=
+ref=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --debian-dir) debian_dir=$2; shift 2 ;;
+        --ref) ref=$2; shift 2 ;;
+        *) break ;;
+    esac
+done
+project=${1:?usage: fetch-source [--debian-dir <dir>] [--ref <commit>] <project> <destdir>}
+destdir=${2:?usage: fetch-source [--debian-dir <dir>] [--ref <commit>] <project> <destdir>}
 config="${root}/ci/project-config"
 project_dir="${root}/projects/${project}"
+debian_dir=${debian_dir:-${project_dir}/debian}
 
-changelog="${project_dir}/debian/changelog"
+changelog="${debian_dir}/changelog"
 source=$(dpkg-parsechangelog -l "${changelog}" -S Source)
 version=$(dpkg-parsechangelog -l "${changelog}" -S Version)
 upstream_version=${version#*:}
 upstream_version=${upstream_version%-*}
 
 mkdir -p "${destdir}"
-case "$("${config}" "${project}" get source)" in
+source_method=$("${config}" "${project}" get source)
+if [ -n "${ref}" ] && [ "${source_method}" != git ]; then
+    echo "fetch-source: --ref needs source: git, but ${project} uses ${source_method}" >&2
+    exit 1
+fi
+case "${source_method}" in
     uscan)
         # uscan fetches the newest upstream release; pinning a version with
         # --download-version or --download-current-version doesn't match
@@ -27,16 +46,22 @@ case "$("${config}" "${project}" get source)" in
         uscan --destdir="${destdir}" --verbose "${project_dir}"
         ;;
     git)
-        tag=$("${config}" "${project}" release-tag)
         work=$(mktemp -d)
         trap 'rm -rf "${work}"' EXIT
         git init -q "${work}/repo"
-        git -C "${work}/repo" fetch -q --depth 1 "$("${config}" "${project}" get upstream.git)" \
-            "refs/tags/${tag}:refs/tags/${tag}"
-        if [ "$("${config}" "${project}" get release.require_signed_tag)" = true ]; then
-            "${root}/ci/verify-signature" "${project}" "${work}/repo" "refs/tags/${tag}"
+        upstream_git=$("${config}" "${project}" get upstream.git)
+        if [ -n "${ref}" ]; then
+            git -C "${work}/repo" fetch -q --depth 1 "${upstream_git}" "${ref}"
+            archive_ref=FETCH_HEAD
+        else
+            tag=$("${config}" "${project}" release-tag)
+            git -C "${work}/repo" fetch -q --depth 1 "${upstream_git}" "refs/tags/${tag}:refs/tags/${tag}"
+            if [ "$("${config}" "${project}" get release.require_signed_tag)" = true ]; then
+                "${root}/ci/verify-signature" "${project}" "${work}/repo" "refs/tags/${tag}"
+            fi
+            archive_ref=refs/tags/${tag}
         fi
-        git -C "${work}/repo" archive --format=tar --prefix="${source}-${upstream_version}/" "refs/tags/${tag}" \
+        git -C "${work}/repo" archive --format=tar --prefix="${source}-${upstream_version}/" "${archive_ref}" \
             | gzip -n > "${work}/${source}-${upstream_version}.tar.gz"
         # mk-origtargz applies debian/copyright's Files-Excluded, as uscan does.
         mk-origtargz --package "${source}" --version "${upstream_version}" --compression gzip --copy \

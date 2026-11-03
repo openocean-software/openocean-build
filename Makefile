@@ -24,6 +24,11 @@
 #                                        # invoking user's keyring -- see
 #                                        # build-debian.yml for how CI
 #                                        # provisions one)
+#   make debian-sbuild DEBIAN_DIR=d SOURCE_REF=c
+#                                        # build upstream commit c with the
+#                                        # debian/ directory d (e.g. from
+#                                        # ci/stage-debian; see
+#                                        # continuous.yml)
 #   make clean                           # remove fetched source / build
 #                                        # products
 #   make distclean                       # clean + remove the Docker images
@@ -36,7 +41,8 @@ $(error OOS_PACKAGE is not set. Please run: export OOS_PACKAGE=<package name>)
 endif
 
 PROJECT_DIR   := projects/$(OOS_PACKAGE)
-DEBIAN_DIR    := $(PROJECT_DIR)/debian
+DEBIAN_DIR    ?= $(PROJECT_DIR)/debian
+SOURCE_REF    ?=
 
 ifeq ($(wildcard $(PROJECT_DIR)/project.yaml),)
 $(error No project '$(OOS_PACKAGE)': expected $(PROJECT_DIR)/project.yaml)
@@ -108,7 +114,7 @@ debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(DEBIAN_BUILD_DIR)
 	mkdir -p $(DEBIAN_BUILD_DIR)
 	rm -rf $(SRC_DIR)/debian
-	cp -a $(DEBIAN_DIR) $(SRC_DIR)/
+	cp -a $(DEBIAN_DIR)/. $(SRC_DIR)/debian/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
 	docker run --rm -it \
 		-v $(DEBIAN_BUILD_DIR):/build \
@@ -181,7 +187,7 @@ debian-sbuild-docker-image: $(DEBIAN_SBUILD_DOCKER_DIR)/Dockerfile
 source: $(ORIG_TARBALL)
 
 $(ORIG_TARBALL):
-	ci/fetch-source $(OOS_PACKAGE) $(BUILD_DIR)
+	ci/fetch-source --debian-dir $(DEBIAN_DIR) $(if $(SOURCE_REF),--ref $(SOURCE_REF)) $(OOS_PACKAGE) $(BUILD_DIR)
 
 # uscan only produces the orig tarball; unpack it into the source
 # directory dpkg-source expects. The extracted top-level directory name
@@ -196,7 +202,7 @@ $(SRC_DIR): $(ORIG_TARBALL)
 
 $(DSC_FILE): $(SRC_DIR) $(shell find $(DEBIAN_DIR) -type f)
 	rm -rf $(SRC_DIR)/debian
-	cp -a $(DEBIAN_DIR) $(SRC_DIR)/
+	cp -a $(DEBIAN_DIR)/. $(SRC_DIR)/debian/
 	cd $(BUILD_DIR) && dpkg-source -b $(notdir $(SRC_DIR))
 
 clean:
