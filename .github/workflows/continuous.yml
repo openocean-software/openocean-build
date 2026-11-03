@@ -1,0 +1,96 @@
+# Builds and publishes the head of each project's default branch to the
+# continuous channel (apt/continuous/<distro>-<dist>), for projects with
+# continuous.enabled. A head is built only if one of the project's
+# maintainers signed it or merged it in GitHub's web UI (ci/verify-signature),
+# and only once: its version (ci/project-config continuous-version) names the
+# commit, and heads already published are skipped.
+#
+# Runs:
+#   - every 6 hours, for projects without continuous.push_dispatch;
+#   - when a project's repository sends a repository_dispatch event of type
+#     "continuous" with client_payload {"project": "<name>"} on each push.
+#     The payload only names the project: the head is looked up and verified
+#     here, so a forged event can only cause a check;
+#   - on demand, for one project.
+#
+# Publishing runs in the "continuous" GitHub Environment, with no required
+# reviewer, deployments limited to main, and its own secrets: the continuous
+# signing key and AWS credentials that can only write apt/continuous/*.
+name: Continuous
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  repository_dispatch:
+    types: [continuous]
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project in projects/ to build the default-branch head of
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# A publish in progress is never cancelled; a newer pending run replaces an
+# older pending one, which is fine since it looks up the newest heads.
+concurrency:
+  group: continuous
+  cancel-in-progress: false
+
+jobs:
+  heads:
+    name: Find heads to build
+    runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.heads.outputs.builds }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          # continuous-version counts commits to projects/<project>/
+          fetch-depth: 0
+
+      - name: Install tools
+        run: |
+          if ! python3 -c 'import yaml' 2>/dev/null || ! command -v dpkg-parsechangelog > /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-yaml dpkg-dev
+          fi
+
+      - name: Find heads
+        id: heads
+        env:
+          REQUESTED: ${{ inputs.project || github.event.client_payload.project }}
+          EVENT: ${{ github.event_name }}
+          # For the GitHub API lookup of who merged a pull request
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${EVENT}" = schedule ]; then
+            args+=(--polled-only)
+          else
+            args+=(--project "${REQUESTED}")
+          fi
+          echo "builds=$(ci/continuous-heads "${args[@]}")" >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: ${{ matrix.project }}
+    needs: heads
+    if: needs.heads.outputs.builds != '[]'
+    strategy:
+      fail-fast: false
+      # GitHub keeps only one pending job per concurrency group, so a third
+      # project waiting to publish would cancel the second.
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.heads.outputs.builds) }}
+    uses: ./.github/workflows/build-debian.yml
+    with:
+      project: ${{ matrix.project }}
+      channel: continuous
+      publish: true
+      source_ref: ${{ matrix.sha }}
+      version: ${{ matrix.version }}
+    secrets: inherit

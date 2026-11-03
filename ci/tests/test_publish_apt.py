@@ -51,10 +51,10 @@ class PublishAptTest(unittest.TestCase):
                 make_deb(d, package, version, arch)
         return root
 
-    def publish(self, artifacts, key=None):
+    def publish(self, artifacts, key=None, keep=None):
         return subprocess.run(
             [str(PUBLISH_APT), "--target", f"file://{self.target}", "--prefix", "release/",
-             "--gpg-key", key or self.key, str(artifacts)],
+             "--gpg-key", key or self.key, *(["--keep", str(keep)] if keep else []), str(artifacts)],
             env=self.env, capture_output=True, text=True)
 
     def published(self, arch="amd64"):
@@ -87,6 +87,38 @@ class PublishAptTest(unittest.TestCase):
         self.assertPublished(self.publish(self.tmp / "all"))
         self.assertPublished(self.publish(self.artifacts("three", {"amd64": [("three", "3.0-1")]})))
         self.assertEqual(self.published(), {("data", "1.0-1"), ("docs", "1.0-1"), ("tool", "1.0-1"), ("three", "3.0-1")})
+
+    def pool_files(self):
+        return sorted(p.name for p in (self.target / "release/debian-trixie/pool").rglob("*.deb"))
+
+    def test_keep_drops_older_versions_and_their_files(self):
+        for i, version in enumerate(["1.0-1", "1.0-2", "1.0-3"]):
+            self.assertPublished(self.publish(self.artifacts(f"v{i}", {"amd64": [("one", version)]}), keep=2))
+        self.assertEqual(self.published(), {("one", "1.0-2"), ("one", "1.0-3")})
+        self.assertEqual(self.pool_files(), ["one_1.0-2_amd64.deb", "one_1.0-3_amd64.deb"])
+
+    def test_keep_counts_each_source_package_separately(self):
+        self.assertPublished(self.publish(self.artifacts("a1", {"amd64": [("one", "1.0-1")]}), keep=1))
+        self.assertPublished(self.publish(self.artifacts("b1", {"amd64": [("two", "5.0-1")]}), keep=1))
+        self.assertPublished(self.publish(self.artifacts("a2", {"amd64": [("one", "1.0-2")]}), keep=1))
+        self.assertEqual(self.published(), {("one", "1.0-2"), ("two", "5.0-1")})
+
+    def test_keep_orders_versions_as_dpkg_does(self):
+        # String order would keep git9 over git10; new packages are always kept, so publish in rising order
+        for i, version in enumerate(["1.0~rc.1+git2.gccc-0oos1", "1.0+git9.gaaa-0oos1", "1.0+git10.gbbb-0oos1"]):
+            self.assertPublished(self.publish(self.artifacts(f"v{i}", {"amd64": [("one", version)]}), keep=2))
+        self.assertEqual(self.published(), {("one", "1.0+git9.gaaa-0oos1"), ("one", "1.0+git10.gbbb-0oos1")})
+
+    def test_without_keep_everything_stays(self):
+        for i, version in enumerate(["1.0-1", "1.0-2", "1.0-3"]):
+            self.assertPublished(self.publish(self.artifacts(f"v{i}", {"amd64": [("one", version)]})))
+        self.assertEqual(len(self.published()), 3)
+
+    def test_indexes_are_published_by_hash(self):
+        self.assertPublished(self.publish(self.artifacts("one", {"amd64": [("one", "1.0-1")]})))
+        release = (self.target / "release/debian-trixie/dists/trixie/Release").read_text()
+        self.assertIn("Acquire-By-Hash: yes", release)
+        self.assertTrue(list((self.target / "release/debian-trixie/dists/trixie/main/binary-amd64/by-hash").rglob("*")))
 
     def test_refuses_an_index_signed_by_another_key(self):
         self.assertPublished(self.publish(self.artifacts("one", {"amd64": [("one", "1.0-1")]})))

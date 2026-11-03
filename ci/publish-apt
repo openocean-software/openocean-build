@@ -7,9 +7,12 @@ for each <distro>-<dist>, this fetches the packages the published index
 already lists (checking the InRelease signature and every checksum), adds the
 new ones, and publishes the lot.
 
+With --keep N, only the newest N versions of each source package stay in the
+index (new ones included), and the package files of the rest are deleted.
+
 Usage:
   publish-apt --target s3://openocean-build/apt --prefix release/ \\
-              --gpg-key <fingerprint> <artifacts-dir>
+              --gpg-key <fingerprint> [--keep N] <artifacts-dir>
 
 <artifacts-dir> holds one directory per build, named
 deb_<project>_<distro>_<dist>_<arch> (see build-debian.yml). --target may also
@@ -17,6 +20,7 @@ be file:///some/dir, for testing without S3.
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import os
@@ -95,6 +99,12 @@ class Store:
         # be told apart from a real permissions problem.
         raise PublishError(f"fetching s3://{self.bucket}/{self.key_prefix}{path} failed:\n{result.stderr}")
 
+    def delete(self, path):
+        if self.scheme == "file":
+            (self.root / path).unlink(missing_ok=True)
+            return
+        run("aws", "s3", "rm", "--only-show-errors", f"s3://{self.bucket}/{self.key_prefix}{path}")
+
 
 def verified_release(inrelease, gpg_key, workdir):
     """Returns the text of an InRelease file after checking it was signed by gpg_key."""
@@ -138,12 +148,12 @@ def check(path, digest, size=None):
         raise PublishError(f"{path} doesn't match the checksum in the published index")
 
 
-def fetch_published(store, repo_path, dist, gpg_key, workdir):
-    """Downloads the packages the published index lists, checked against it. Returns their paths."""
+def published_index(store, repo_path, dist, gpg_key, workdir):
+    """Maps each package file the published index lists to its index fields, checked against InRelease."""
     inrelease = workdir / "InRelease"
     if not store.fetch(f"{repo_path}/dists/{dist}/InRelease", inrelease):
         print(f"Nothing published at {repo_path} yet", flush=True)
-        return []
+        return {}
     release = verified_release(inrelease, gpg_key, workdir)
 
     packages = {}
@@ -154,7 +164,11 @@ def fetch_published(store, repo_path, dist, gpg_key, workdir):
         check(index, digest, size)
         for fields in stanzas(index.read_text()):
             packages[fields["Filename"]] = fields
+    return packages
 
+
+def fetch_packages(store, repo_path, packages, workdir):
+    """Downloads package files listed in the published index, checked against it. Returns their paths."""
     pool = workdir / "pool"
     pool.mkdir()
     paths = []
@@ -166,6 +180,42 @@ def fetch_published(store, repo_path, dist, gpg_key, workdir):
         paths.append(dest)
     print(f"Keeping {len(paths)} published package files from {repo_path}", flush=True)
     return paths
+
+
+def source_version(fields):
+    """(source package, source version) of a binary package's control fields."""
+    source = fields.get("Source") or fields["Package"]
+    match = re.fullmatch(r"(\S+) \((\S+)\)", source)
+    return (match[1], match[2]) if match else (source, fields["Version"])
+
+
+def deb_fields(deb):
+    out = subprocess.run(["dpkg-deb", "-f", str(deb), "Package", "Version", "Source"],
+                         check=True, capture_output=True, text=True).stdout
+    return dict(line.split(": ", 1) for line in out.splitlines() if ": " in line)
+
+
+def compare_versions(a, b):
+    if a == b:
+        return 0
+    return -1 if subprocess.run(["dpkg", "--compare-versions", a, "lt", b]).returncode == 0 else 1
+
+
+def retained(published, debs, keep):
+    """Splits the published package files into those to keep and those to drop: --keep per source package."""
+    if not keep:
+        return published, {}
+    versions = {}
+    for fields in [*published.values(), *map(deb_fields, debs)]:
+        source, version = source_version(fields)
+        versions.setdefault(source, set()).add(version)
+    newest = {source: set(sorted(vs, key=functools.cmp_to_key(compare_versions))[-keep:])
+              for source, vs in versions.items()}
+    kept, dropped = {}, {}
+    for filename, fields in published.items():
+        source, version = source_version(fields)
+        (kept if version in newest[source] else dropped)[filename] = fields
+    return kept, dropped
 
 
 def group_artifacts(artifacts):
@@ -184,7 +234,7 @@ def group_artifacts(artifacts):
     return groups
 
 
-def publish(store, prefix, gpg_key, artifacts):
+def publish(store, prefix, gpg_key, artifacts, keep=None):
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         config = tmp / "aptly.conf"
@@ -195,7 +245,8 @@ def publish(store, prefix, gpg_key, artifacts):
             repo_path = f"{prefix}{distro}-{dist}"
             workdir = tmp / repo_path.replace("/", "_")
             workdir.mkdir()
-            existing = fetch_published(store, repo_path, dist, gpg_key, workdir)
+            kept, dropped = retained(published_index(store, repo_path, dist, gpg_key, workdir), debs, keep)
+            existing = fetch_packages(store, repo_path, kept, workdir)
 
             repo = f"{distro}-{dist}"
             run(*aptly, "repo", "create", f"-distribution={dist}", "-component=main", repo)
@@ -203,8 +254,13 @@ def publish(store, prefix, gpg_key, artifacts):
                 run(*aptly, "repo", "add", repo, *existing)
             # A rebuild of an already published version replaces it.
             run(*aptly, "repo", "add", "-force-replace", repo, *debs)
-            run(*aptly, "publish", "repo", "-batch", "-force-overwrite", f"-gpg-key={gpg_key}",
-                f"-distribution={dist}", repo, store.aptly_endpoint(repo_path))
+            # by-hash indexes keep apt consistent while a publish is half-way through, or cached
+            run(*aptly, "publish", "repo", "-batch", "-force-overwrite", "-acquire-by-hash",
+                f"-gpg-key={gpg_key}", f"-distribution={dist}", repo, store.aptly_endpoint(repo_path))
+            # Only once the new index no longer lists them
+            for filename in sorted(dropped):
+                print(f"Removing {repo_path}/{filename} (older than the newest {keep})", flush=True)
+                store.delete(f"{repo_path}/{filename}")
 
 
 def main():
@@ -212,11 +268,14 @@ def main():
     parser.add_argument("--target", required=True, help="s3://bucket/prefix or file:///dir")
     parser.add_argument("--prefix", required=True, help="channel prefix, e.g. release/")
     parser.add_argument("--gpg-key", required=True, help="fingerprint of the signing (sub)key")
+    parser.add_argument("--keep", type=int, help="keep only the newest N versions of each source package")
     parser.add_argument("artifacts", help="directory of deb_<project>_<distro>_<dist>_<arch> directories")
     args = parser.parse_args()
     if args.prefix and not args.prefix.endswith("/"):
         parser.error("--prefix must end with /")
-    publish(Store(args.target), args.prefix, args.gpg_key, args.artifacts)
+    if args.keep is not None and args.keep < 1:
+        parser.error("--keep must be at least 1")
+    publish(Store(args.target), args.prefix, args.gpg_key, args.artifacts, args.keep)
 
 
 if __name__ == "__main__":

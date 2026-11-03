@@ -75,6 +75,11 @@ def validate(project, config, root=ROOT):
             raise ConfigError(f"{project}: release.beta_tags isn't a valid regular expression: {e}")
         if "beta" not in config["channels"]:
             raise ConfigError(f"{project}: release.beta_tags needs a beta channel in defaults.yaml")
+    if config["continuous"]["enabled"]:
+        if config["source"] != "git":
+            raise ConfigError(f"{project}: continuous builds need source git")
+        if not (root / "projects" / project / "maintainers.yaml").is_file():
+            raise ConfigError(f"{project}: continuous builds need projects/{project}/maintainers.yaml")
     if config.get("release", {}).get("require_signed_tag") and not (root / "projects" / project / "maintainers.yaml").is_file():
         raise ConfigError(f"{project}: release.require_signed_tag needs projects/{project}/maintainers.yaml")
     targets = config.get("targets", {})
