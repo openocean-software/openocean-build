@@ -33,6 +33,10 @@ upstream:
 release:
   require_signed_tag: false
   beta_tags: null
+continuous:
+  enabled: false
+  accept_github_merges: true
+  push_dispatch: false
 install_test:
   target: { distro: ubuntu, dist: resolute, arch: amd64 }
   packages: []
@@ -181,6 +185,16 @@ class ProjectConfigTest(unittest.TestCase):
         (self.root / "defaults.yaml").write_text(DEFAULTS.replace("  beta: { prefix: beta/, environment: release }\n", ""))
         with self.assertRaisesRegex(project_config.ConfigError, "beta channel"):
             self.load(self.project("p", "source: uscan\nrelease:\n  beta_tags: beta\n"))
+
+    def test_tag_version_reverses_release_tag(self):
+        config = self.load(self.project("p", "source: uscan\n"))
+        for tag, version in [("v1.2.0", "1.2.0"), ("v0.0.1-beta.1", "0.0.1~beta.1"), ("other-1.0", None)]:
+            with self.subTest(tag=tag):
+                self.assertEqual(project_config.tag_version(config, tag), version)
+
+    def test_continuous_builds_need_git_source(self):
+        with self.assertRaisesRegex(project_config.ConfigError, "continuous builds need source git"):
+            self.load(self.project("p", "source: uscan\ncontinuous:\n  enabled: true\n"))
 
     def test_every_real_project_loads(self):
         for name in project_config.list_projects():

@@ -134,6 +134,61 @@ class FetchSourceGitTest(unittest.TestCase):
         self.assertEqual(self.members(self.out / "hello_1.2.0+dfsg.orig.tar.gz"),
                          ["hello-1.2.0+dfsg/hello.c"])
 
+    def commit(self, message):
+        (self.upstream / "hello.c").write_text(f"/* {message} */\n")
+        run("git", "-C", self.upstream, "commit", "-q", "-am", message, env=self.env)
+        return run("git", "-C", self.upstream, "rev-parse", "HEAD", env=self.env).stdout.strip()
+
+    def continuous_version(self, commit):
+        # The packaging revision counts this scratch openocean-build's commits to the project
+        if not (self.root / ".git").exists():
+            run("git", "init", "-q", self.root, env=self.env)
+            run("git", "-C", self.root, "add", ".", env=self.env)
+            run("git", "-C", self.root, "commit", "-q", "-m", "add hello", env=self.env)
+        return run(self.root / "ci" / "project-config", "hello", "continuous-version", self.upstream, commit,
+                   env=self.env).stdout.strip()
+
+    def test_continuous_version_counts_from_the_nearest_release_tag(self):
+        self.project("1.2.0-1")
+        first = run("git", "-C", self.upstream, "rev-parse", "--short=7", "HEAD", env=self.env).stdout.strip()
+        self.assertEqual(self.continuous_version("HEAD"), f"0+git1.g{first}-0oos1")
+        self.tag("v1.2.0-beta.1", self.maint)
+        self.assertEqual(self.continuous_version("HEAD"), f"1.2.0~beta.1+git0.g{first}-0oos1")
+        self.commit("two")
+        sha = self.commit("three")
+        self.assertEqual(self.continuous_version(sha), f"1.2.0~beta.1+git2.g{sha[:7]}-0oos1")
+        self.tag("v1.2.0", self.maint)
+        self.assertEqual(self.continuous_version(sha), f"1.2.0+git0.g{sha[:7]}-0oos1")
+        self.tag("unrelated-tag")
+        self.assertEqual(self.continuous_version(sha), f"1.2.0+git0.g{sha[:7]}-0oos1")
+
+    def test_continuous_versions_sort_between_releases(self):
+        self.project("1.2.0-1")
+        self.tag("v1.2.0-beta.1", self.maint)
+        sha = self.commit("two")
+        version = self.continuous_version(sha)
+        for lower, higher in [("1.2.0~beta.1-1", version), (version, "1.2.0-1"), (version, "1.2.0~beta.2-1")]:
+            with self.subTest(lower=lower, higher=higher):
+                run("dpkg", "--compare-versions", lower, "lt", higher)
+
+    def test_ref_fetches_a_commit_with_a_staged_changelog(self):
+        self.project("1.2.0-1")
+        self.tag("v1.2.0", self.maint)
+        sha = self.commit("unreleased")
+        staged = self.tmp / "staged"
+        version = "1.2.0+git1.g" + sha[:7] + "-0oos1"
+        shutil.copy2(ROOT / "ci" / "stage-debian", self.root / "ci" / "stage-debian")
+        run(self.root / "ci" / "stage-debian", "hello", version, staged, "Continuous build.", env=self.env)
+        self.assertIn(f"hello ({version})", (staged / "debian" / "changelog").read_text().splitlines()[0])
+        result = subprocess.run([str(self.root / "ci" / "fetch-source"), "--debian-dir", str(staged / "debian"),
+                                 "--ref", sha, "hello", str(self.tmp / "out")],
+                                capture_output=True, text=True, env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        tarball = self.tmp / "out" / f"hello_1.2.0+git1.g{sha[:7]}.orig.tar.gz"
+        with tarfile.open(tarball) as t:
+            hello = t.extractfile(f"hello-1.2.0+git1.g{sha[:7]}/hello.c").read().decode()
+        self.assertEqual(hello, "/* unreleased */\n")
+
     def test_missing_tag_fails(self):
         self.project("9.9.9-1")
         result = self.fetch()

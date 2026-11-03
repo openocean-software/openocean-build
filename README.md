@@ -46,6 +46,18 @@ Signed-By: /usr/share/keyrings/openocean-release.asc
 
 A prerelease such as `0.1.0~beta.1` sorts below `0.1.0`, so the final release replaces it once published.
 
+The continuous channel has a build of the latest commit on each project's default branch, for projects that enable it. A commit is only built if one of the project's maintainers signed it or merged it in GitHub's web UI. It's signed with its own key, [`keys/continuous.asc`](keys/continuous.asc) (fingerprint `DAF0 8DD7 788E 6C84 C6F8  E8D3 E59E 1A81 FECD B228`):
+
+```
+Types: deb
+URIs: https://apt.oceansoft.org/continuous/debian-trixie
+Suites: trixie
+Components: main
+Signed-By: /usr/share/keyrings/openocean-continuous.asc
+```
+
+Continuous versions look like `0.1.0~beta.1+git3.gabc1234-0oos6`: three commits after the `v0.1.0-beta.1` tag, at commit `abc1234`. They sort above that tag's package and below the next release, and only the newest five per project are kept.
+
 ## Adding a project
 
 *This section was written by Claude.*
@@ -57,5 +69,7 @@ Each project is a directory in `projects/`:
 - `maintainers.yaml` and `keys/` (for `source: git` with `require_signed_tag`): the people whose signed release tags are trusted, and their GPG public keys or SSH keys. Only these keys are trusted for this project.
 
 `ci/project-config <project> get <setting>` shows the merged settings. To build locally, see the top of the `Makefile`.
+
+With `continuous: enabled: true` in its `project.yaml` (and `source: git`), `.github/workflows/continuous.yml` also builds the project's default-branch head every 6 hours, or on a `repository_dispatch` event of type `continuous` naming the project.
 
 A change to `projects/<project>/debian/changelog` on `main` releases that project (`.github/workflows/release.yml`), after approval in the `release` GitHub Environment. If the version's upstream tag matches the project's `release.beta_tags`, it goes to the beta channel instead (e.g. `0.1.0~beta.1-1`, tag `v0.1.0-beta.1`). Before publishing, every package is installed on a clean Ubuntu 26.04 system and the project's `install_test` commands are run.

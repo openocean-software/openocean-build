@@ -23,7 +23,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends aptly devscripts dpkg-dev gnupg openssh-client python3-yaml shellcheck
 
       - name: Lint shell scripts
-        run: shellcheck ci/fetch-source ci/install-test
+        run: shellcheck ci/fetch-source ci/install-test ci/stage-debian
 
       - name: Check every project's settings
         run: |

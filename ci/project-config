@@ -10,6 +10,8 @@ Usage:
   project-config <project> install-script   install_test.commands as a bash script
   project-config <project> release-tag      upstream tag of the debian/changelog version
   project-config <project> channel          channel that version publishes to (beta or release)
+  project-config <project> continuous-version <git-dir> <commit>
+                                            Debian version for a continuous build of <commit>
 """
 
 import json
@@ -73,6 +75,11 @@ def validate(project, config, root=ROOT):
             raise ConfigError(f"{project}: release.beta_tags isn't a valid regular expression: {e}")
         if "beta" not in config["channels"]:
             raise ConfigError(f"{project}: release.beta_tags needs a beta channel in defaults.yaml")
+    if config["continuous"]["enabled"]:
+        if config["source"] != "git":
+            raise ConfigError(f"{project}: continuous builds need source git")
+        if not (root / "projects" / project / "maintainers.yaml").is_file():
+            raise ConfigError(f"{project}: continuous builds need projects/{project}/maintainers.yaml")
     if config.get("release", {}).get("require_signed_tag") and not (root / "projects" / project / "maintainers.yaml").is_file():
         raise ConfigError(f"{project}: release.require_signed_tag needs projects/{project}/maintainers.yaml")
     targets = config.get("targets", {})
@@ -136,6 +143,38 @@ def release_tag(config, version):
     return config["upstream"]["tag_format"].replace("{version}", tag_version)
 
 
+def tag_version(config, tag):
+    """The Debian upstream version a release tag stands for: the inverse of release_tag."""
+    prefix, suffix = config["upstream"]["tag_format"].split("{version}")
+    if not (tag.startswith(prefix) and tag.endswith(suffix)):
+        return None
+    return tag[len(prefix):len(tag) - len(suffix) or None].replace("-", "~")
+
+
+def continuous_version(project, config, git_dir, commit, root=ROOT):
+    """<last tag's version>+git<commits since>.g<sha>-0oos<packaging changes>.
+
+    Sorts above the last tag's release and below the next one. The commit count
+    only grows along the default branch, and the revision changes whenever
+    projects/<project>/ changes, so a packaging change gets a new version.
+    """
+    def git(*args, cwd=git_dir):
+        return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    sha = git("rev-parse", "--short=7", commit)
+    pattern = config["upstream"]["tag_format"].replace("{version}", "*")
+    tags = [t for t in git("tag", "--merged", commit, "--list", pattern, "--sort=-creatordate").splitlines()
+            if tag_version(config, t)]
+    base, count = "0", git("rev-list", "--count", commit)
+    if tags:
+        # The nearest tag by commit distance, as git describe picks it
+        distances = {t: int(git("rev-list", "--count", f"{t}..{commit}")) for t in tags}
+        tag = min(distances, key=distances.get)
+        base, count = tag_version(config, tag), distances[tag]
+    revision = git("rev-list", "--count", "HEAD", "--", f"projects/{project}", cwd=root)
+    return f"{base}+git{count}.g{sha}-0oos{revision}"
+
+
 def channel(config, version):
     beta_tags = config["release"].get("beta_tags")
     if beta_tags and re.search(beta_tags, release_tag(config, version)):
@@ -165,6 +204,9 @@ def main(argv):
         return
     if argv[1:] == ["channel"]:
         print(channel(load(argv[0]), upstream_version(argv[0])))
+        return
+    if len(argv) == 4 and argv[1] == "continuous-version":
+        print(continuous_version(argv[0], load(argv[0]), argv[2], argv[3]))
         return
     sys.exit(__doc__)
 

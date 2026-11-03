@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Lists the default-branch heads that continuous.yml should build and publish.
+
+Usage:
+  continuous-heads [--project NAME] [--polled-only]
+
+For each project with continuous.enabled (or just NAME), finds the head of the
+upstream default branch and keeps it if
+  - a maintainer signed it, or GitHub signed it when a maintainer merged a pull
+    request in the web UI (with continuous.accept_github_merges), and
+  - its continuous version isn't published yet.
+--polled-only leaves out projects that notify on each push (continuous.push_dispatch).
+
+Prints a JSON list of {"project", "sha", "version"}. Heads it skips, and why,
+go to stderr and to $GITHUB_STEP_SUMMARY when set.
+"""
+
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+_loader = importlib.machinery.SourceFileLoader("project_config", str(ROOT / "ci" / "project-config"))
+_spec = importlib.util.spec_from_loader("project_config", _loader)
+project_config = importlib.util.module_from_spec(_spec)
+_loader.exec_module(project_config)
+
+
+def report(line):
+    print(line, file=sys.stderr, flush=True)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a") as f:
+            f.write(f"- {line}\n")
+
+
+def git(*args):
+    return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def default_head(url):
+    """(branch, sha) of the remote's default branch."""
+    out = git("ls-remote", "--symref", url, "HEAD")
+    branch = re.search(r"^ref: refs/heads/(\S+)\tHEAD$", out, re.M)
+    sha = re.search(r"^([0-9a-f]{40})\tHEAD$", out, re.M)
+    if not branch or not sha:
+        raise RuntimeError(f"can't find the default branch of {url}:\n{out}")
+    return branch[1], sha[1]
+
+
+def github_repo(url):
+    match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?", url)
+    return match[1] if match else None
+
+
+def published(config, project, version):
+    """Whether the install-test target's continuous index already lists this project at this version."""
+    target = config["install_test"]["target"]
+    channel = config["channels"]["continuous"]
+    url = (f"{config['apt_url'].rstrip('/')}/{channel['prefix']}{target['distro']}-{target['dist']}"
+           f"/dists/{target['dist']}/main/binary-{target['arch']}/Packages")
+    try:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            index = response.read().decode()
+    except urllib.error.HTTPError as e:
+        # S3 behind CloudFront answers 403 for a key that doesn't exist yet
+        if e.code in (403, 404):
+            return False
+        raise
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, FileNotFoundError):
+            return False
+        raise
+    for stanza in re.split(r"\n\s*\n", index):
+        fields = dict(re.findall(r"^(\S+): (.*)$", stanza, re.M))
+        if "Package" in fields and project_config_source(fields) == (project, version):
+            return True
+    return False
+
+
+def project_config_source(fields):
+    source = fields.get("Source") or fields["Package"]
+    match = re.fullmatch(r"(\S+) \((\S+)\)", source)
+    return (match[1], match[2]) if match else (source, fields["Version"])
+
+
+def head_to_build(project, config, workdir):
+    url = config["upstream"]["git"]
+    branch, sha = default_head(url)
+    clone = workdir / project
+    # Commits and tags, but no file contents: enough to verify and to count
+    git("clone", "-q", "--filter=blob:none", "--no-checkout", url, str(clone))
+    args = []
+    repo = github_repo(url)
+    if config["continuous"]["accept_github_merges"] and repo:
+        args += ["--github-repo", repo]
+    verified = subprocess.run([str(ROOT / "ci" / "verify-signature"), *args, project, str(clone), sha],
+                              capture_output=True, text=True)
+    if verified.returncode != 0:
+        reason = verified.stderr.strip().splitlines()[0].removeprefix("verify-signature: ")
+        report(f"{project}: skipping {branch} at {sha[:7]}: {reason}")
+        return None
+    version = project_config.continuous_version(project, config, clone, sha)
+    if published(config, project, version):
+        report(f"{project}: {branch} at {sha[:7]} is already published as {version}")
+        return None
+    report(f"{project}: building {branch} at {sha[:7]} as {version} ({verified.stdout.strip()})")
+    return {"project": project, "sha": sha, "version": version}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--project")
+    parser.add_argument("--polled-only", action="store_true")
+    args = parser.parse_args()
+
+    if args.project:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9.+-]*", args.project):
+            sys.exit(f"continuous-heads: '{args.project}' isn't a project name")
+        projects = [args.project]
+    else:
+        projects = project_config.list_projects()
+    configs = {p: project_config.load(p) for p in projects}
+    if args.project and not configs[args.project]["continuous"]["enabled"]:
+        sys.exit(f"continuous-heads: {args.project} doesn't have continuous.enabled")
+    selected = [p for p, c in configs.items() if c["continuous"]["enabled"]
+                and not (args.polled_only and c["continuous"]["push_dispatch"])]
+
+    builds = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for project in selected:
+            build = head_to_build(project, configs[project], Path(tmp))
+            if build:
+                builds.append(build)
+    print(json.dumps(builds))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except project_config.ConfigError as e:
+        sys.exit(f"continuous-heads: {e}")

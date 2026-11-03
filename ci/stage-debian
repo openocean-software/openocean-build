@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Copies a project's debian/ to <destdir>/debian with a changelog entry for
+# <version> on top, for builds of versions the changelog doesn't name (e.g.
+# continuous builds). Nothing in projects/ changes.
+#
+# Usage: stage-debian <project> <version> <destdir> <message>
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+project=${1:?usage: stage-debian <project> <version> <destdir> <message>}
+version=${2:?missing <version>}
+destdir=${3:?missing <destdir>}
+message=${4:?missing <message>}
+
+rm -rf "${destdir}/debian"
+mkdir -p "${destdir}"
+cp -a "${root}/projects/${project}/debian" "${destdir}/debian"
+dist=$(dpkg-parsechangelog -l "${destdir}/debian/changelog" -S Distribution)
+DEBFULLNAME="Open Ocean Software continuous builds" DEBEMAIL="toby@oceansoft.org" \
+    dch --changelog "${destdir}/debian/changelog" --newversion "${version}" \
+        --distribution "${dist}" --force-distribution "${message}"

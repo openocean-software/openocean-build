@@ -29,6 +29,15 @@ channels:
     environment: release
     signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
     key: keys/release.asc
+  # Builds of each new head of a project's default branch (continuous.yml).
+  # Published without human approval, so it has its own key and credentials.
+  continuous:
+    prefix: continuous/
+    environment: continuous
+    signing_key: DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
+    key: keys/continuous.asc
+    # Newest versions kept of each source package
+    keep: 5
 
 upstream:
   # The upstream tag for a version (Debian "~" becomes "-", +dfsg is dropped)
@@ -40,6 +49,15 @@ release:
   # Regular expression for upstream tags that publish to the beta channel
   # rather than release; null for none.
   beta_tags: null
+
+continuous:
+  enabled: false
+  # A head commit qualifies if a maintainer signed it, or (with this on) GitHub
+  # signed it when a maintainer merged a pull request in its web UI.
+  accept_github_merges: true
+  # true once the project's repository notifies openocean-build on each push;
+  # until then continuous.yml polls the project every 6 hours.
+  push_dispatch: false
 
 # Where every newly built package is installed before publishing.
 install_test:
