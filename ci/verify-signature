@@ -2,17 +2,28 @@
 """Checks that a git tag or commit is signed by one of a project's maintainers.
 
 Usage:
-  verify-signature <project> <git-dir> <ref>
+  verify-signature [--github-repo OWNER/REPO] <project> <git-dir> <ref>
 
 The maintainers and their keys come from projects/<project>/maintainers.yaml,
 with GPG public keys in projects/<project>/keys/*.asc. Only those keys are
-trusted, so a maintainer of one project is trusted on no other. Prints the
-signer and exits 0 if the signature is good; exits 1 otherwise.
+trusted, so a maintainer of one project is trusted on no other.
+
+With --github-repo, a commit also passes if GitHub made it when a pull request
+in that repository was merged in its web UI by a maintainer (the maintainer's
+"github" login): GitHub signs those with its own key, trust/github-web-flow.asc.
+The merger comes from the GitHub API (using $GITHUB_TOKEN if set), since only
+merge commits record the merger as author; squash and rebase merges keep the
+pull request author.
+
+Prints who vouches for the ref and exits 0, or exits 1.
 """
 
+import argparse
+import json
 import os
 import re
 import subprocess
+import urllib.request
 import sys
 import tempfile
 from pathlib import Path
@@ -85,26 +96,68 @@ def make_allowed_signers(maintainers, workdir):
     return path
 
 
-def verify(project, git_dir, ref, root=ROOT):
+def git_verify(git_dir, kind, ref, gnupghome, allowed_signers):
+    result = subprocess.run(
+        ["git", "-C", str(git_dir), "-c", f"gpg.ssh.allowedSignersFile={allowed_signers}",
+         f"verify-{kind}", "--raw", ref],
+        capture_output=True, text=True,
+        # Only this keyring and these signers, not the caller's git or GPG setup
+        env=dict(os.environ, GNUPGHOME=str(gnupghome), GIT_CONFIG_GLOBAL=os.devnull))
+    return result.returncode, result.stdout + result.stderr
+
+
+def verify(project, git_dir, ref, root=ROOT, github_repo=None):
     maintainers = load_maintainers(project, root)
+    kind = subprocess.run(["git", "-C", str(git_dir), "cat-file", "-t", ref],
+                          capture_output=True, text=True).stdout.strip()
+    if kind not in ("tag", "commit"):
+        raise VerifyError(f"{ref} is a {kind or 'missing object'}, not a signed tag or commit")
     with tempfile.TemporaryDirectory() as tmp:
         workdir = Path(tmp)
         gnupghome = make_keyring(project, maintainers, workdir, root)
         allowed_signers = make_allowed_signers(maintainers, workdir)
-        kind = subprocess.run(["git", "-C", str(git_dir), "cat-file", "-t", ref],
-                              capture_output=True, text=True).stdout.strip()
-        if kind not in ("tag", "commit"):
-            raise VerifyError(f"{ref} is a {kind or 'missing object'}, not a signed tag or commit")
-        result = subprocess.run(
-            ["git", "-C", str(git_dir), "-c", f"gpg.ssh.allowedSignersFile={allowed_signers}",
-             f"verify-{kind}", "--raw", ref],
-            capture_output=True, text=True,
-            # Only this keyring and these signers, not the caller's git or GPG setup
-            env=dict(os.environ, GNUPGHOME=str(gnupghome), GIT_CONFIG_GLOBAL=os.devnull))
-        output = result.stdout + result.stderr
-        if result.returncode != 0:
-            raise VerifyError(f"{ref} isn't signed by a maintainer of {project}:\n{output}")
-        return signer(maintainers, output, ref, project)
+        returncode, output = git_verify(git_dir, kind, ref, gnupghome, allowed_signers)
+        if returncode == 0:
+            return f"signed by {signer(maintainers, output, ref, project)}"
+        if kind == "commit" and github_repo:
+            return github_merge(project, maintainers, git_dir, ref, github_repo, workdir, root)
+        raise VerifyError(f"{ref} isn't signed by a maintainer of {project}:\n{output}")
+
+
+def github_merge(project, maintainers, git_dir, ref, github_repo, workdir, root):
+    """Accepts a commit GitHub signed when a maintainer merged a pull request in its web UI."""
+    gnupghome = workdir / "web-flow"
+    gnupghome.mkdir(mode=0o700)
+    key = root / "trust" / "github-web-flow.asc"
+    gpg(gnupghome, "--import", str(key), check=True)
+    returncode, output = git_verify(git_dir, "commit", ref, gnupghome, os.devnull)
+    if returncode != 0 or not re.search(r"^\[GNUPG:\] VALIDSIG ", output, re.M) or \
+            re.search(r"^\[GNUPG:\] (EXPKEYSIG|REVKEYSIG|EXPSIG|BADSIG|ERRSIG)", output, re.M):
+        raise VerifyError(f"{ref} is signed neither by a maintainer of {project} nor by GitHub:\n{output}")
+    sha, committer = subprocess.run(["git", "-C", str(git_dir), "log", "-1", "--format=%H%n%cn <%ce>", ref],
+                                    check=True, capture_output=True, text=True).stdout.split("\n")[:2]
+    if committer != "GitHub <noreply@github.com>":
+        raise VerifyError(f"{ref} is signed by GitHub's key but committed by {committer}")
+
+    merged = [pr for pr in github_api(f"repos/{github_repo}/commits/{sha}/pulls")
+              if pr.get("merge_commit_sha") == sha and pr.get("merged_at")]
+    if not merged:
+        raise VerifyError(f"{sha} is signed by GitHub, but no merged pull request in {github_repo} made it")
+    number = merged[0]["number"]
+    merged_by = (github_api(f"repos/{github_repo}/pulls/{number}").get("merged_by") or {}).get("login")
+    for m in maintainers:
+        if m.get("github") and m["github"] == merged_by:
+            return f"GitHub's merge of {github_repo}#{number} by {m['name']}"
+    raise VerifyError(f"{github_repo}#{number} was merged by {merged_by}, who isn't a maintainer of {project}")
+
+
+def github_api(path):
+    base = os.environ.get("VERIFY_SIGNATURE_GITHUB_API", "https://api.github.com").rstrip("/")
+    request = urllib.request.Request(f"{base}/{path}", headers={"Accept": "application/vnd.github+json"})
+    if os.environ.get("GITHUB_TOKEN") and base.startswith("https://"):
+        request.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.load(response)
 
 
 def signer(maintainers, output, ref, project):
@@ -127,9 +180,13 @@ def signer(maintainers, output, ref, project):
 
 
 def main(argv):
-    if len(argv) != 3:
-        sys.exit(__doc__)
-    print(f"{argv[2]} is signed by {verify(*argv)}")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--github-repo", help="OWNER/REPO whose web-UI merges by a maintainer also pass")
+    parser.add_argument("project")
+    parser.add_argument("git_dir")
+    parser.add_argument("ref")
+    args = parser.parse_args(argv)
+    print(f"{args.ref} is {verify(args.project, args.git_dir, args.ref, github_repo=args.github_repo)}")
 
 
 if __name__ == "__main__":

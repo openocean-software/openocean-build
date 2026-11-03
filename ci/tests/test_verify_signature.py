@@ -4,6 +4,7 @@ Needs git, gpg and ssh-keygen. Run from the repository root:
   python3 -m unittest discover -s ci/tests
 """
 
+import json
 import os
 import re
 import subprocess
@@ -160,6 +161,84 @@ class VerifySignatureTest(unittest.TestCase):
         self.project("p", f"maintainers:\n  - name: Maint\n    gpg: [{fpr}]\n")
         self.gpg_tag("v1.0.0", fpr)
         self.assertRejected(self.verify("p", "v1.0.0"), "no key in projects/p/keys/")
+
+    def github_merge_commit(self, committer="GitHub <noreply@github.com>"):
+        """A commit signed by a stand-in for GitHub's web-flow key, as a web-UI merge makes."""
+        web_flow, armored = self.gpg_key("noreply@github.com")
+        (self.root / "trust").mkdir(exist_ok=True)
+        (self.root / "trust" / "github-web-flow.asc").write_text(armored)
+        name, email = committer[:-1].split(" <")
+        env = dict(self.env, GIT_COMMITTER_NAME=name, GIT_COMMITTER_EMAIL=email)
+        run("git", "-C", self.repo, "commit", "-q", "--allow-empty", "-S" + web_flow, "-m", "Merge", env=env)
+        return run("git", "-C", self.repo, "rev-parse", "HEAD", env=self.env).stdout.strip()
+
+    def github_api(self, sha, merged_by, merge_commit_sha=None):
+        """Recorded GitHub API answers, served from file:// to verify-signature."""
+        api = self.tmp / "api"
+        (api / "repos/o/r/commits" / sha).mkdir(parents=True)
+        (api / "repos/o/r/pulls").mkdir(parents=True, exist_ok=True)
+        pulls = [] if merged_by is None else [
+            {"number": 7, "merge_commit_sha": merge_commit_sha or sha, "merged_at": "2026-11-03T00:00:00Z"}]
+        (api / "repos/o/r/commits" / sha / "pulls").write_text(json.dumps(pulls))
+        (api / "repos/o/r/pulls/7").write_text(json.dumps({"number": 7, "merged_by": {"login": merged_by}}))
+        self.env["VERIFY_SIGNATURE_GITHUB_API"] = f"file://{api}"
+
+    def verify_github(self, project, ref):
+        return subprocess.run([str(self.root / "ci" / "verify-signature"), "--github-repo", "o/r",
+                               project, str(self.repo), ref],
+                              capture_output=True, text=True, env=self.env)
+
+    def test_github_merge_by_a_maintainer(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        self.github_api(sha, merged_by="maint")
+        result = self.verify_github("p", sha)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GitHub's merge of o/r#7 by Maint", result.stdout)
+
+    def test_github_merge_needs_the_github_repo_option(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        self.github_api(sha, merged_by="maint")
+        self.assertRejected(self.verify("p", sha), "isn't signed by a maintainer")
+
+    def test_github_merge_by_someone_else_is_rejected(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        self.github_api(sha, merged_by="mallory")
+        self.assertRejected(self.verify_github("p", sha), "merged by mallory, who isn't a maintainer")
+
+    def test_github_signed_commit_without_a_merged_pull_request_is_rejected(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        self.github_api(sha, merged_by=None)
+        self.assertRejected(self.verify_github("p", sha), "no merged pull request")
+
+    def test_pull_request_that_merged_another_commit_is_rejected(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        self.github_api(sha, merged_by="maint", merge_commit_sha="0" * 40)
+        self.assertRejected(self.verify_github("p", sha), "no merged pull request")
+
+    def test_github_key_with_another_committer_is_rejected(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit(committer="Someone <someone@example.org>")
+        self.github_api(sha, merged_by="maint")
+        self.assertRejected(self.verify_github("p", sha), "committed by Someone")
+
+    def test_unsigned_commit_is_rejected_with_github_repo(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        web_flow, web_armored = self.gpg_key("noreply@github.com")
+        (self.root / "trust").mkdir()
+        (self.root / "trust" / "github-web-flow.asc").write_text(web_armored)
+        self.assertRejected(self.verify_github("p", "HEAD"), "neither by a maintainer")
 
     def test_project_without_maintainers_trusts_nothing(self):
         (self.root / "projects" / "p").mkdir(parents=True)
