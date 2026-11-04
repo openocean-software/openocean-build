@@ -33,15 +33,15 @@ sequenceDiagram
 
 ## Every 6 hours
 
-Projects with `continuous.push_dispatch: false` (the default) are polled at 17 minutes past every sixth hour (UTC). This needs nothing from the project, so it's the way to start, and suits projects outside the `openocean-software` organization. A head that's already published is skipped, so a quiet project costs a `git ls-remote` and a clone of its history.
+Projects with `continuous.push_dispatch: false` (the default) are polled at 17 minutes past every sixth hour (UTC). This needs nothing from the project, so it's the way to start. A head that's already published is skipped, so a quiet project costs a `git ls-remote` and a clone of its history.
 
 ## On each push
 
 To build within minutes of each push, the project's repository starts `continuous.yml` itself. It does so with the `openocean-build-dispatch` GitHub App, whose only permission is Actions: write on openocean-build: it can start workflows, but not change code. The workflow input only names the project; `continuous.yml` looks up and verifies the head itself, so a misused token can at most cause a check.
 
-To set it up for a project in the `openocean-software` organization:
+To set it up for a project:
 
-1. In the organization's settings, give the project's repository access to the `OOS_DISPATCH_APP_ID` variable and `OOS_DISPATCH_APP_KEY` secret (both have "selected repositories" access).
+1. Give the project's repository the App's credentials: the `OOS_DISPATCH_APP_ID` variable and `OOS_DISPATCH_APP_KEY` secret. For a repository in the `openocean-software` organization, give it access to the organization's copies (both have "selected repositories" access). A repository elsewhere (e.g. GobySoft/dccl) needs its own copies, in its *Secrets and variables → Actions* settings; the App stays installed only on openocean-software.
 2. Add `.github/workflows/notify-openocean-build.yml` to the project, changing the project name in the last step:
 
     ```yaml
@@ -76,7 +76,6 @@ To set it up for a project in the `openocean-software` organization:
 
 3. Set `continuous.push_dispatch: true` in the project's `project.yaml`, so the 6-hour poll leaves it out.
 
-A project outside the organization would need the App installed on its organization; until then, it uses the 6-hour poll.
 
 ## By hand
 
