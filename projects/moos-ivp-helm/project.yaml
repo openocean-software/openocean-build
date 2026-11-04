@@ -28,6 +28,6 @@ install_test:
     - |
       printf '%s\n' '#include "HelmEngine.h"' '#include "InfoBuffer.h"' '#include "LedgerSnap.h"' '#include <iostream>' \
         'int main() { IvPDomain d; d.addDomain("speed", 0, 4, 41); InfoBuffer ib; LedgerSnap ls; HelmEngine e(d, &ib, &ls); std::cout << "helm engine ok" << std::endl; }' > /tmp/consumer/helm.cpp
-    - cmake -S /tmp/consumer -B /tmp/consumer/build -DCMAKE_PREFIX_PATH=/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/ivp-helm
+    - cmake -S /tmp/consumer -B /tmp/consumer/build -DCMAKE_PREFIX_PATH=/usr/lib/$(gcc -print-multiarch)/ivp-helm
     - cmake --build /tmp/consumer/build
     - /tmp/consumer/build/helm | grep -F 'helm engine ok'
