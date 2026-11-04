@@ -1,0 +1,34 @@
+upstream:
+  git: https://github.com/GobySoft/dccl.git
+  # Tags are bare versions, with "_" before a prerelease (5.0.0_alpha2)
+  tag_format: "{version}"
+  prerelease_separator: _
+
+# The release tag, fetched with git and signed by a maintainer.
+source: git
+release:
+  require_signed_tag: true
+  beta_tags: '^[0-9]+\.[0-9]+\.[0-9]+_(alpha|beta|rc)[0-9]+$'
+
+continuous:
+  enabled: true
+  # No push dispatch from GobySoft/dccl yet, so continuous.yml polls it every 6 hours
+  push_dispatch: false
+
+install_test:
+  packages: [g++, pkgconf, protobuf-compiler]
+  commands:
+    - dccl --help
+    - protoc -Isrc/share/examples/quickstart_navreport -I/usr/include --cpp_out=/tmp --python_out=/tmp navreport.proto
+    - g++ -o /tmp/quick -I/tmp src/share/examples/quickstart_navreport/quick.cpp /tmp/navreport.pb.cc -ldccl $(pkg-config --cflags --libs protobuf)
+    - "/tmp/quick | grep -F 'x: 450 y: 550 z: -100 veh_class: AUV battery_ok: true'"
+    - |
+      PYTHONPATH=/tmp python3 -c '
+      import dccl, navreport_pb2
+      dccl.addProtoIncludePath("/usr/include")
+      dccl.addProtoIncludePath("src/share/examples/quickstart_navreport")
+      dccl.loadProtoFile("src/share/examples/quickstart_navreport/navreport.proto")
+      codec = dccl.Codec()
+      codec.load("NavigationReport")
+      msg = navreport_pb2.NavigationReport(x=450, y=550, z=-100, veh_class=navreport_pb2.NavigationReport.AUV, battery_ok=True)
+      assert codec.decode(codec.encode(msg)) == msg'

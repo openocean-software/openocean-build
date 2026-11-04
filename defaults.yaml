@@ -40,8 +40,9 @@ channels:
     keep: 5
 
 upstream:
-  # The upstream tag for a version (Debian "~" becomes "-", +dfsg is dropped)
+  # The upstream tag for a version (Debian "~" becomes prerelease_separator, +dfsg is dropped)
   tag_format: "v{version}"
+  prerelease_separator: "-"
 
 release:
   # Fetch (source: git) only tags signed by one of projects/<name>/maintainers.yaml.
