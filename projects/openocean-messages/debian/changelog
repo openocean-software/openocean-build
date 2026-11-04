@@ -1,3 +1,12 @@
+openocean-messages (0.0.1~beta.3-1) trixie; urgency=medium
+
+  * New beta release, from upstream tag v0.0.1-beta.3.
+  * Add the nanopb C library (libopenocean-messages-nanopb1,
+    libopenocean-messages-nanopb-dev) and the LCM types
+    (libopenocean-messages-lcm-dev).
+
+ -- Toby Schneider <toby@gobysoft.org>  Wed, 04 Nov 2026 11:00:00 +1000
+
 openocean-messages (0.0.1~beta.1-1) trixie; urgency=medium
 
   * Initial beta release, from upstream tag v0.0.1-beta.1.
