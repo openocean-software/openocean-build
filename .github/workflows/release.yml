@@ -5,6 +5,8 @@
 # build-debian.yml; publishing waits for approval in the channel's GitHub
 # Environment.
 name: Release
+# Started by hand, the run is named after the project; a push keeps the default (the commit title)
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release {0}', inputs.project) || '' }}
 
 on:
   push:
