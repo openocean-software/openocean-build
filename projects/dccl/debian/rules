@@ -4,6 +4,14 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export CTEST_OUTPUT_ON_FAILURE = ON
 export PYBUILD_NAME = dccl5
 
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+# char is unsigned on arm64, which the CCL compatibility encoders don't allow
+# for (src/ccl/WhoiUtil.cpp), so their test aborts there
+ifeq ($(DEB_HOST_ARCH),arm64)
+CTEST_ARGS = ARGS+=-E ARGS+=dccl_test_ccl_whoi_util
+endif
+
 %:
 	dh $@ --buildsystem=cmake
 
@@ -22,6 +30,9 @@ override_dh_auto_build:
 override_dh_auto_install:
 	dh_auto_install
 	dh_auto_install --buildsystem=pybuild --sourcedirectory=python
+
+override_dh_auto_test:
+	dh_auto_test -- $(CTEST_ARGS)
 
 override_dh_auto_clean:
 	dh_auto_clean

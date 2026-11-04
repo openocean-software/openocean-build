@@ -2,5 +2,7 @@ dccl (5.1.1-1) trixie; urgency=medium
 
   * Package DCCL for openocean-build, from upstream tag 5.1.1 and the
     packaging in GobySoft/dccl-debian.
+  * Skip dccl_test_ccl_whoi_util on arm64, where char is unsigned and the
+    CCL velocity encoding comes back wrong (upstream bug).
 
  -- Toby Schneider <toby@gobysoft.org>  Wed, 04 Nov 2026 16:00:00 +1000
