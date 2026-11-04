@@ -41,7 +41,7 @@ To build within minutes of each push, the project's repository starts `continuou
 
 To set it up for a project:
 
-1. Give the project's repository the App's credentials: the `OOS_DISPATCH_APP_ID` variable and `OOS_DISPATCH_APP_KEY` secret. For a repository in the `openocean-software` organization, give it access to the organization's copies (both have "selected repositories" access). A repository elsewhere (e.g. GobySoft/dccl) needs its own copies, in its *Secrets and variables → Actions* settings; the App stays installed only on openocean-software.
+1. Give the project's repository the App's credentials: the `OOS_DISPATCH_APP_ID` variable and `OOS_DISPATCH_APP_KEY` secret. For a repository in the `openocean-software` organization, give it access to the organization's copies (both have "selected repositories" access). A repository elsewhere (e.g. GobySoft/dccl) needs its own copies, in its *Secrets and variables → Actions* settings; the App stays installed only on openocean-software. Give each such repository its own key (the App's settings, *Credentials → Key pairs → New key*), so one can be revoked without breaking the others.
 2. Add `.github/workflows/notify-openocean-build.yml` to the project, changing the project name in the last step:
 
     ```yaml
