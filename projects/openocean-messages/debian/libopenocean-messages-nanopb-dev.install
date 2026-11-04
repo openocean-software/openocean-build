@@ -1,0 +1,3 @@
+usr/include/openocean_messages_nanopb
+usr/lib/*/libopenocean_messages_nanopb.so
+usr/lib/*/cmake/openocean_messages/openocean_messages-nanopb-targets*.cmake
