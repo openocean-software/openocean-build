@@ -55,7 +55,7 @@ continuous:
   # A head commit qualifies if a maintainer signed it, or (with this on) GitHub
   # signed it when a maintainer merged a pull request in its web UI.
   accept_github_merges: true
-  # true once the project's repository notifies openocean-build on each push;
+  # true once the project's repository starts continuous.yml on each push;
   # until then continuous.yml polls the project every 6 hours.
   push_dispatch: false
 

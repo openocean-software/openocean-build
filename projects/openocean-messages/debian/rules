@@ -6,5 +6,5 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 	dh $@ --buildsystem=cmake
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DOPENOCEAN_CPP=ON -DOPENOCEAN_PYTHON=ON \
+	dh_auto_configure -- -DOPENOCEAN_CPP=ON -DOPENOCEAN_PYTHON=ON -DOPENOCEAN_NANOPB=ON -DOPENOCEAN_LCM=ON \
 		-DBUILD_TESTING=$(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)

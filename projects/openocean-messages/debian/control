@@ -7,6 +7,10 @@ Build-Depends: debhelper-compat (= 13),
                cmake,
                libprotobuf-dev,
                protobuf-compiler,
+               nanopb,
+               libnanopb-dev,
+               liblcm-dev,
+               liblcm-bin,
                python3,
                pkgconf <!nocheck>,
                libudunits2-dev <!nocheck>,
@@ -52,3 +56,47 @@ Description: common messages for marine robotic systems (Python modules)
  and generates native types from them for several middleware and languages.
  .
  This package contains the Python Protobuf modules (openocean.messages).
+
+Package: libopenocean-messages-nanopb1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: common messages for marine robotic systems (nanopb C library)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the shared library of the messages for nanopb, a
+ Protobuf implementation in C for embedded systems.
+
+Package: libopenocean-messages-nanopb-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libopenocean-messages-nanopb1 (= ${binary:Version}),
+         libopenocean-messages-dev (= ${binary:Version}),
+         libnanopb-dev,
+         ${misc:Depends}
+Description: common messages for marine robotic systems (nanopb development files)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the nanopb C headers, and the nanopb component of the
+ CMake package (find_package(openocean_messages COMPONENTS nanopb)).
+
+Package: libopenocean-messages-lcm-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libopenocean-messages-dev (= ${binary:Version}),
+         liblcm-dev,
+         liblcm-bin,
+         python3,
+         python3-protobuf,
+         ${misc:Depends}
+Description: common messages for marine robotic systems (LCM types)
+ openocean-messages defines common messages for ocean systems in Protobuf,
+ and generates native types from them for several middleware and languages.
+ .
+ This package contains the messages as LCM types (C++ headers and .lcm
+ files), C++ converters between them and the Protobuf messages, and the lcm
+ component of the CMake package (find_package(openocean_messages COMPONENTS lcm)).

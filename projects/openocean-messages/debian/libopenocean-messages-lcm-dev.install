@@ -1,0 +1,4 @@
+usr/include/openocean/*.hpp
+usr/include/openocean/lcm_convert.h
+usr/share/openocean_messages/lcm
+usr/lib/*/cmake/openocean_messages/openocean_messages-lcm-targets*.cmake

@@ -1,4 +1,5 @@
-usr/include
+usr/include/openocean/messages
 usr/lib/*/libopenocean_messages.so
-usr/lib/*/cmake
-usr/share/openocean_messages
+usr/lib/*/cmake/openocean_messages/openocean_messages-config*.cmake
+usr/lib/*/cmake/openocean_messages/openocean_messages-cpp-targets*.cmake
+usr/share/openocean_messages/generators

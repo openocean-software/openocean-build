@@ -70,6 +70,6 @@ Each project is a directory in `projects/`:
 
 `ci/project-config <project> get <setting>` shows the merged settings. To build locally, see the top of the `Makefile`.
 
-With `continuous: enabled: true` in its `project.yaml` (and `source: git`), `.github/workflows/continuous.yml` also builds the project's default-branch head every 6 hours, or on a `repository_dispatch` event of type `continuous` naming the project.
+With `continuous: enabled: true` in its `project.yaml` (and `source: git`), `.github/workflows/continuous.yml` also builds the project's default-branch head every 6 hours. To build on each push instead, the project's repository starts that workflow (see openocean-messages' `.github/workflows/notify-openocean-build.yml`) with a GitHub App that has only Actions: write on openocean-build. Its credentials are the org's `OOS_DISPATCH_APP_ID` variable and `OOS_DISPATCH_APP_KEY` secret. Give the repository access to both, then set `continuous: push_dispatch: true`.
 
 A change to `projects/<project>/debian/changelog` on `main` releases that project (`.github/workflows/release.yml`), after approval in the `release` GitHub Environment. If the version's upstream tag matches the project's `release.beta_tags`, it goes to the beta channel instead (e.g. `0.1.0~beta.1-1`, tag `v0.1.0-beta.1`). Before publishing, every package is installed on a clean Ubuntu 26.04 system and the project's `install_test` commands are run.
