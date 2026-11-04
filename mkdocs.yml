@@ -1,0 +1,24 @@
+site_name: openocean-build
+repo_url: https://github.com/openocean-software/openocean-build
+docs_dir: docs
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Installing packages: installing.md
+  - Channels: channels.md
+  - Signing and trust: trust.md
+  - Keys: keys.md
+  - Continuous builds: continuous.md
+  - Projects: projects.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
