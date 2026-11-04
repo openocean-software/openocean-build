@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | moos-ivp | [moos-ivp/moos-ivp](https://github.com/moos-ivp/moos-ivp) | uscan | release | no |
 | openocean-messages | [openocean-software/openocean-messages](https://github.com/openocean-software/openocean-messages) | git, signed tags | release, beta (`v*-alpha.N`, `-beta.N`, `-rc.N`) | on each push |
-| dccl | [GobySoft/dccl](https://github.com/GobySoft/dccl) | git, signed tags | release, beta (`*_alphaN`, `_betaN`, `_rcN`) | every 6 hours |
+| dccl | [GobySoft/dccl](https://github.com/GobySoft/dccl) | git, signed tags | release, beta (`*_alphaN`, `_betaN`, `_rcN`) | on each push |
 
 ## Adding a project
 

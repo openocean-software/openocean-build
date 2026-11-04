@@ -12,8 +12,8 @@ release:
 
 continuous:
   enabled: true
-  # No push dispatch from GobySoft/dccl yet, so continuous.yml polls it every 6 hours
-  push_dispatch: false
+  # Its notify-openocean-build.yml starts continuous.yml on each push to 5.0
+  push_dispatch: true
 
 install_test:
   packages: [g++, pkgconf, protobuf-compiler]
