@@ -33,12 +33,15 @@ upstream:
   tag_format: "v{version}"
   prerelease_separator: "-"
 release:
+  enabled: true
   require_signed_tag: false
   beta_tags: null
 continuous:
   enabled: false
   accept_github_merges: true
   push_dispatch: false
+  branch: null
+  version_base: null
 install_test:
   target: { distro: ubuntu, dist: resolute, arch: amd64 }
   packages: []
@@ -205,6 +208,10 @@ class ProjectConfigTest(unittest.TestCase):
         for tag, version in [("v1.2.0", "1.2.0"), ("v0.0.1-beta.1", "0.0.1~beta.1"), ("other-1.0", None)]:
             with self.subTest(tag=tag):
                 self.assertEqual(project_config.tag_version(config, tag), version)
+
+    def test_snapshot_only_projects_need_continuous_builds(self):
+        with self.assertRaisesRegex(project_config.ConfigError, "release.enabled false needs continuous.enabled"):
+            self.load(self.project("p", "source: git\nupstream:\n  git: https://example.org/p.git\nrelease:\n  enabled: false\n"))
 
     def test_continuous_builds_need_git_source(self):
         with self.assertRaisesRegex(project_config.ConfigError, "continuous builds need source git"):

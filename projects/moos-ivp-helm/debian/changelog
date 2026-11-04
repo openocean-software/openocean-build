@@ -1,0 +1,7 @@
+moos-ivp-helm (24.8.1-1) trixie; urgency=medium
+
+  * The IvP helm libraries without MOOS, built from MOOS-IvP master with
+    moos-ivp/moos-ivp#147. Only continuous snapshots are built
+    (release.enabled false); this entry is their base.
+
+ -- Toby Schneider <toby@gobysoft.org>  Wed, 04 Nov 2026 18:00:00 +1000

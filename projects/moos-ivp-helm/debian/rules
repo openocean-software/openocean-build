@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+# Its own prefix: the headers and libraries overlap libmoos-ivp's by name but
+# not by content, and the libraries find each other through their $ORIGIN RPATH
+PREFIX = /usr/lib/$(DEB_HOST_MULTIARCH)/ivp-helm
+BUILD_DIR = $(CURDIR)/build
+
+%:
+	dh $@ --buildsystem=cmake --sourcedirectory=ivp/src --builddirectory=$(BUILD_DIR)
+
+# IvP writes its libraries and headers next to the source unless told otherwise
+override_dh_auto_configure:
+	dh_auto_configure -- -DIVP_BUILD_HELM_LIBS_ONLY=ON -DBUILD_SHARED_LIBS=ON \
+		-DCMAKE_INSTALL_PREFIX=$(PREFIX) \
+		-DIVP_LIB_DIRECTORY=$(BUILD_DIR)/lib -DIVP_INC_DIRECTORY=$(BUILD_DIR)/include -DIVP_BIN_DIRECTORY=$(BUILD_DIR)/bin
+
+override_dh_auto_install:
+	dh_auto_install
+	mkdir -p debian/tmp/etc/ld.so.conf.d
+	echo $(PREFIX)/lib > debian/tmp/etc/ld.so.conf.d/ivp-helm-$(DEB_HOST_MULTIARCH).conf
+
+# The libraries aren't on the default search path at build time
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/debian/libivp-helm0$(PREFIX)/lib

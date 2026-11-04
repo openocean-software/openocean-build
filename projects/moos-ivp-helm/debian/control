@@ -1,0 +1,45 @@
+Source: moos-ivp-helm
+Section: libs
+Priority: optional
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://moos-ivp.org
+Vcs-Git: https://github.com/GobySoft/moos-ivp.git -b ivp-without-moos
+Vcs-Browser: https://github.com/GobySoft/moos-ivp/tree/ivp-without-moos
+
+Package: libivp-helm0
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: IvP helm libraries built without MOOS
+ MOOS-IvP includes software for high-level control (decision-making) on
+ robotic platforms (primarily marine). IvP stands for "Interval
+ Programming", a mathematical programming model for multi-objective
+ optimization; the IvP Helm represents and reconciles the output of its
+ behaviors with it.
+ .
+ This package provides lib_helmivp (the helm engine, behavior sets and
+ behavior factory) and the libraries it links, built as shared libraries
+ without MOOS, MOOSGeodesy or FLTK, for running the helm outside MOOS. They
+ are installed under /usr/lib/<multiarch>/ivp-helm, so they can coexist with
+ the libmoos-ivp packages.
+
+Package: libivp-helm-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libivp-helm0 (= ${binary:Version}), ${misc:Depends}
+Description: IvP helm libraries built without MOOS (development files)
+ MOOS-IvP includes software for high-level control (decision-making) on
+ robotic platforms (primarily marine). IvP stands for "Interval
+ Programming", a mathematical programming model for multi-objective
+ optimization; the IvP Helm represents and reconciles the output of its
+ behaviors with it.
+ .
+ This package provides the headers and CMake package of the helm libraries
+ built without MOOS. Find them with
+ find_package(IVP CONFIG) after adding /usr/lib/<multiarch>/ivp-helm to
+ CMAKE_PREFIX_PATH, and link the IVP::helmivp, IVP::behaviors, ... targets.

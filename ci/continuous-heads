@@ -2,14 +2,15 @@
 """Lists the default-branch heads that continuous.yml should build and publish.
 
 Usage:
-  continuous-heads [--project NAME] [--polled-only]
+  continuous-heads [--project NAME] [--polled-only] [--unverified]
 
 For each project with continuous.enabled (or just NAME), finds the head of the
-upstream default branch and keeps it if
+upstream default branch (or continuous.branch) and keeps it if
   - a maintainer signed it, or GitHub signed it when a maintainer merged a pull
     request in the web UI (with continuous.accept_github_merges), and
   - its continuous version isn't published yet.
 --polled-only leaves out projects that notify on each push (continuous.push_dispatch).
+--unverified keeps every head, for a check that builds without publishing.
 
 Prints a JSON list of {"project", "sha", "version"}. Heads it skips, and why,
 go to stderr and to $GITHUB_STEP_SUMMARY when set.
@@ -48,8 +49,14 @@ def git(*args):
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def default_head(url):
-    """(branch, sha) of the remote's default branch."""
+def remote_head(url, branch=None):
+    """(branch, sha) of the remote's default branch, or of the named branch."""
+    if branch:
+        out = git("ls-remote", url, f"refs/heads/{branch}")
+        sha = re.search(r"^([0-9a-f]{40})\t", out, re.M)
+        if not sha:
+            raise RuntimeError(f"{url} has no branch {branch}")
+        return branch, sha[1]
     out = git("ls-remote", "--symref", url, "HEAD")
     branch = re.search(r"^ref: refs/heads/(\S+)\tHEAD$", out, re.M)
     sha = re.search(r"^([0-9a-f]{40})\tHEAD$", out, re.M)
@@ -94,12 +101,16 @@ def project_config_source(fields):
     return (match[1], match[2]) if match else (source, fields["Version"])
 
 
-def head_to_build(project, config, workdir):
+def head_to_build(project, config, workdir, unverified=False):
     url = config["upstream"]["git"]
-    branch, sha = default_head(url)
+    branch, sha = remote_head(url, config["continuous"].get("branch"))
     clone = workdir / project
     # Commits and tags, but no file contents: enough to verify and to count
     git("clone", "-q", "--filter=blob:none", "--no-checkout", url, str(clone))
+    if unverified:
+        version = project_config.continuous_version(project, config, clone, sha)
+        report(f"{project}: {branch} at {sha[:7]} as {version} (unverified)")
+        return {"project": project, "sha": sha, "version": version}
     args = []
     repo = github_repo(url)
     if config["continuous"]["accept_github_merges"] and repo:
@@ -122,6 +133,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project")
     parser.add_argument("--polled-only", action="store_true")
+    parser.add_argument("--unverified", action="store_true")
     args = parser.parse_args()
 
     if args.project:
@@ -139,7 +151,7 @@ def main():
     builds = []
     with tempfile.TemporaryDirectory() as tmp:
         for project in selected:
-            build = head_to_build(project, configs[project], Path(tmp))
+            build = head_to_build(project, configs[project], Path(tmp), unverified=args.unverified)
             if build:
                 builds.append(build)
     print(json.dumps(builds))

@@ -1,0 +1,29 @@
+Description: Give the shared libraries a SONAME
+ Upstream builds static libraries and sets no VERSION or SOVERSION. With
+ BUILD_SHARED_LIBS every IvP library gets SOVERSION IVP_SOVERSION (0 until
+ upstream releases the helm-only build), so packages can depend on the ABI
+ they were built against.
+Forwarded: not-needed
+Last-Update: 2026-11-04
+
+--- a/ivp/src/CMakeLists.txt
++++ b/ivp/src/CMakeLists.txt
+@@ -6,6 +6,7 @@
+ 
+ SET(IVP_BUILD_HELM_LIBS_ONLY OFF CACHE BOOL
+   "Build only lib_helmivp and the libraries it links, without MOOS, MOOSGeodesy, apps, or GUI.")
++SET(IVP_SOVERSION "0" CACHE STRING "SOVERSION of the shared libraries; bump when the ABI changes")
+ IF(BUILD_SHARED_LIBS)
+   # So the installed libraries find each other outside the linker's search path
+   IF(APPLE)
+@@ -327,6 +328,10 @@
+ # Each library declares its own link dependencies in its CMakeLists.txt.
+ FUNCTION(IVP_ADD_LIBRARY TARGET_NAME)
+   ADD_LIBRARY(${TARGET_NAME} ${ARGN})
++  IF(BUILD_SHARED_LIBS)
++    # Upstream sets no SONAME; the packages need one to depend on
++    SET_TARGET_PROPERTIES(${TARGET_NAME} PROPERTIES VERSION ${IVP_SOVERSION}.0.0 SOVERSION ${IVP_SOVERSION})
++  ENDIF()
+   TARGET_INCLUDE_DIRECTORIES(${TARGET_NAME} PUBLIC
+     $<BUILD_INTERFACE:${IVP_INC_DIRECTORY}/ivp>
+     $<INSTALL_INTERFACE:include/ivp>)

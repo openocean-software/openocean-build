@@ -9,7 +9,7 @@ continuous:
   enabled: true
 ```
 
-`.github/workflows/continuous.yml` then builds the head of the project's default branch, if it's [trusted](trust.md#continuous-builds-signed-or-merged-heads) and not already published, and publishes it to the [continuous channel](channels.md). A build can be started three ways:
+`.github/workflows/continuous.yml` then builds the head of the project's default branch (or of `continuous.branch`), if it's [trusted](trust.md#continuous-builds-signed-or-merged-heads) and not already published, and publishes it to the [continuous channel](channels.md). A build can be started three ways:
 
 | | Every 6 hours | On each push | By hand |
 |---|---|---|---|

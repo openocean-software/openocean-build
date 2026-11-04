@@ -1,0 +1,33 @@
+# The IvP helm libraries built without MOOS, from MOOS-IvP master with
+# moos-ivp/moos-ivp#147 (IVP_BUILD_HELM_LIBS_ONLY), as GobySoft's fork carries
+# it. Nothing is released: the branch has no tags of its own, so only
+# continuous snapshots are built, versioned after the last upstream tag.
+upstream:
+  git: https://github.com/GobySoft/moos-ivp.git
+source: git
+release:
+  enabled: false
+continuous:
+  enabled: true
+  branch: ivp-without-moos
+  # Upstream tags releases on a side commit, so no tag is reachable from master
+  version_base: 24.8.1
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    # No MOOS anywhere in the dependencies
+    - dpkg-query -W -f='${Depends}\n' libivp-helm0 libivp-helm-dev
+    - "! dpkg-query -W -f='${Depends}' libivp-helm0 libivp-helm-dev | grep -i moos"
+    # A consumer finds the package with CMake and runs a helm engine; the loader
+    # finds the libraries through ld.so.conf.d
+    - mkdir -p /tmp/consumer
+    - |
+      printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(consumer CXX)' 'find_package(IVP CONFIG REQUIRED)' \
+        'add_executable(helm helm.cpp)' 'target_link_libraries(helm IVP::helmivp IVP::logic IVP::ivpcore)' > /tmp/consumer/CMakeLists.txt
+    - |
+      printf '%s\n' '#include "HelmEngine.h"' '#include "InfoBuffer.h"' '#include "LedgerSnap.h"' '#include <iostream>' \
+        'int main() { IvPDomain d; d.addDomain("speed", 0, 4, 41); InfoBuffer ib; LedgerSnap ls; HelmEngine e(d, &ib, &ls); std::cout << "helm engine ok" << std::endl; }' > /tmp/consumer/helm.cpp
+    - cmake -S /tmp/consumer -B /tmp/consumer/build -DCMAKE_PREFIX_PATH=/usr/lib/$(gcc -print-multiarch)/ivp-helm
+    - cmake --build /tmp/consumer/build
+    - /tmp/consumer/build/helm | grep -F 'helm engine ok'

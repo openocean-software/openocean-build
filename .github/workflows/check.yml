@@ -1,6 +1,6 @@
 # Checks pull requests: lints and tests the ci/ scripts, builds the docs, then builds and
-# install-tests each changed project on its install-test target only. Nothing
-# is published.
+# install-tests each changed project on its install-test target only (a project
+# with release.enabled false builds its continuous head). Nothing is published.
 name: Check
 
 on:
@@ -54,7 +54,7 @@ jobs:
     name: Find changed projects
     runs-on: ubuntu-latest
     outputs:
-      projects: ${{ steps.projects.outputs.projects }}
+      builds: ${{ steps.projects.outputs.builds }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -67,26 +67,40 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+          if ! python3 -c 'import yaml' 2>/dev/null || ! command -v dpkg-parsechangelog > /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-yaml dpkg-dev
+          fi
           changed=$(git diff --name-only "${BASE}...HEAD")
           # A change to the shared build affects every project.
           if grep -qvE '^(projects/|README\.md$|docs/|mkdocs\.yml$)' <<< "${changed}"; then
-            projects=$(ci/project-config list)
+            mapfile -t projects < <(ci/project-config list | python3 -c 'import json, sys; print(*json.load(sys.stdin), sep="\n")')
           else
-            projects=$({ grep '^projects/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u \
-              | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split()))')
+            mapfile -t projects < <({ grep '^projects/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u)
           fi
-          echo "projects=${projects}" >> "${GITHUB_OUTPUT}"
+          # Each build is {"project", "source_ref", "version"}: the changelog version, or the
+          # continuous head for a project that only builds snapshots
+          builds=()
+          for project in "${projects[@]}"; do
+            if [ "$(ci/project-config "${project}" get release.enabled)" = true ]; then
+              builds+=("{\"project\": \"${project}\", \"source_ref\": \"\", \"version\": \"\"}")
+            else
+              head=$(ci/continuous-heads --project "${project}" --unverified | python3 -c 'import json, sys; print(json.dumps(json.load(sys.stdin)[0]))')
+              builds+=("$(python3 -c 'import json, sys; h = json.loads(sys.argv[1]); print(json.dumps({"project": h["project"], "source_ref": h["sha"], "version": h["version"]}))' "${head}")")
+            fi
+          done
+          echo "builds=[$(IFS=,; echo "${builds[*]}")]" >> "${GITHUB_OUTPUT}"
 
   build:
     name: ${{ matrix.project }}
     needs: projects
-    if: needs.projects.outputs.projects != '[]'
+    if: needs.projects.outputs.builds != '[]'
     strategy:
       fail-fast: false
       matrix:
-        project: ${{ fromJSON(needs.projects.outputs.projects) }}
+        include: ${{ fromJSON(needs.projects.outputs.builds) }}
     uses: ./.github/workflows/build-debian.yml
     with:
       project: ${{ matrix.project }}
       all_targets: false
+      source_ref: ${{ matrix.source_ref }}
+      version: ${{ matrix.version }}

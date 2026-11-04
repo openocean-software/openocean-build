@@ -52,7 +52,7 @@ class ContinuousHeadsTest(unittest.TestCase):
         run("git", "-C", repo, "commit", "-q", *(["-S" + self.maint] if signed else []), "-m", "one", env=self.env)
         return repo
 
-    def project(self, name, upstream, enabled=True, push_dispatch=False):
+    def project(self, name, upstream, enabled=True, push_dispatch=False, branch=None, version_base=None):
         d = self.root / "projects" / name
         (d / "debian").mkdir(parents=True)
         (d / "keys").mkdir()
@@ -64,6 +64,8 @@ class ContinuousHeadsTest(unittest.TestCase):
             continuous:
               enabled: {str(enabled).lower()}
               push_dispatch: {str(push_dispatch).lower()}
+              branch: {branch or 'null'}
+              version_base: {version_base or 'null'}
             """))
         (d / "maintainers.yaml").write_text(f"maintainers:\n  - name: Maint\n    gpg: [{self.maint}]\n")
         (d / "keys" / "maint.asc").write_text(self.maint_key)
@@ -108,6 +110,39 @@ class ContinuousHeadsTest(unittest.TestCase):
         builds, log = self.heads()
         self.assertEqual(builds, [])
         self.assertIn("already published", log)
+
+    def test_named_branch_is_built_instead_of_the_default(self):
+        repo = self.upstream("hello", signed=True)
+        run("git", "-C", repo, "checkout", "-q", "-b", "feature", env=self.env)
+        (repo / "README").write_text("feature")
+        run("git", "-C", repo, "commit", "-q", "-a", "-S" + self.maint, "-m", "two", env=self.env)
+        run("git", "-C", repo, "checkout", "-q", "main", env=self.env)
+        self.project("hello", repo, branch="feature")
+        self.commit_build()
+        sha = run("git", "-C", repo, "rev-parse", "feature", env=self.env).stdout.strip()
+        builds, log = self.heads()
+        self.assertEqual(builds, [{"project": "hello", "sha": sha, "version": f"0+git2.g{sha[:7]}-0oos1"}])
+        self.assertIn("hello: building feature at", log)
+
+    def test_version_base_stands_in_for_a_missing_tag(self):
+        repo = self.upstream("hello", signed=True)
+        self.project("hello", repo, version_base="24.8.1")
+        self.commit_build()
+        sha = run("git", "-C", repo, "rev-parse", "HEAD", env=self.env).stdout.strip()
+        self.assertEqual(self.heads()[0][0]["version"], f"24.8.1+git1.g{sha[:7]}-0oos1")
+
+    def test_unverified_keeps_unsigned_and_published_heads(self):
+        repo = self.upstream("hello", signed=False)
+        self.project("hello", repo)
+        self.commit_build()
+        sha = run("git", "-C", repo, "rev-parse", "HEAD", env=self.env).stdout.strip()
+        index = self.apt / "continuous/ubuntu-resolute/dists/resolute/main/binary-amd64/Packages"
+        index.parent.mkdir(parents=True)
+        index.write_text(f"Package: libhello1\nSource: hello\nVersion: 0+git1.g{sha[:7]}-0oos1\n\n")
+        self.assertEqual(self.heads()[0], [])
+        builds, log = self.heads("--unverified")
+        self.assertEqual(builds, [{"project": "hello", "sha": sha, "version": f"0+git1.g{sha[:7]}-0oos1"}])
+        self.assertIn("(unverified)", log)
 
     def test_only_enabled_projects_and_polled_ones_when_polling(self):
         self.project("off", self.upstream("off", signed=True), enabled=False)
