@@ -73,7 +73,7 @@ jobs:
           changed=$(git diff --name-only "${BASE}...HEAD")
           # A change to the shared build affects every project.
           if grep -qvE '^(projects/|README\.md$|docs/|mkdocs\.yml$)' <<< "${changed}"; then
-            mapfile -t projects < <(ci/project-config list | python3 -c 'import json, sys; print(*json.load(sys.stdin))')
+            mapfile -t projects < <(ci/project-config list | python3 -c 'import json, sys; print(*json.load(sys.stdin), sep="\n")')
           else
             mapfile -t projects < <({ grep '^projects/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u)
           fi
