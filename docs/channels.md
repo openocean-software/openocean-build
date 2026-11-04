@@ -6,7 +6,7 @@ Packages are published to three channels, each its own set of apt repositories:
 
 | | Release | Beta | Continuous |
 |---|---|---|---|
-| Contents | Tagged releases | Tagged prereleases | The latest commit on each project's default branch |
+| Contents | Tagged releases | Tagged prereleases | The latest commit on each project's default branch (or `continuous.branch`) |
 | Started by | A `debian/changelog` change on `main` | A `debian/changelog` change on `main` | The 6-hour poll, or a push to the project ([Continuous builds](continuous.md)) |
 | Source must be | A release tag signed by a maintainer (projects with `release.require_signed_tag`) | Same as release | A commit signed by a maintainer, or merged by one in GitHub's web UI |
 | Approval | A required reviewer in the `release` GitHub Environment; the waiting job is named after the project, version and channel | Same as release | None |

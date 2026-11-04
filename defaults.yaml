@@ -45,6 +45,9 @@ upstream:
   prerelease_separator: "-"
 
 release:
+  # false for a project built only as continuous snapshots: a changelog
+  # change on main releases nothing, and pull requests check the head instead
+  enabled: true
   # Fetch (source: git) only tags signed by one of projects/<name>/maintainers.yaml.
   require_signed_tag: false
   # Regular expression for upstream tags that publish to the beta channel
@@ -59,6 +62,11 @@ continuous:
   # true once the project's repository starts continuous.yml on each push;
   # until then continuous.yml polls the project every 6 hours.
   push_dispatch: false
+  # Branch to build instead of upstream.git's default branch
+  branch: null
+  # Upstream version the snapshots follow when no release tag is reachable from
+  # the head (a fork without tags, or a branch upstream tags elsewhere)
+  version_base: null
 
 # Where every newly built package is installed before publishing.
 install_test:

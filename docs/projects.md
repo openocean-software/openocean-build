@@ -7,6 +7,7 @@
 | moos-ivp | [moos-ivp/moos-ivp](https://github.com/moos-ivp/moos-ivp) | uscan | release | no |
 | openocean-messages | [openocean-software/openocean-messages](https://github.com/openocean-software/openocean-messages) | git, signed tags | release, beta (`v*-alpha.N`, `-beta.N`, `-rc.N`) | on each push |
 | dccl | [GobySoft/dccl](https://github.com/GobySoft/dccl) | git, signed tags | release, beta (`*_alphaN`, `_betaN`, `_rcN`) | on each push |
+| moos-ivp-helm | [GobySoft/moos-ivp](https://github.com/GobySoft/moos-ivp), branch `ivp-without-moos` | git | none: snapshots only | every 6 hours |
 
 ## Adding a project
 
@@ -15,6 +16,8 @@ Each project is a directory in `projects/`, named after its Debian source packag
 - `project.yaml`: where the source comes from, and any settings that differ from `defaults.yaml`.
 - `debian/`: the Debian packaging. Its `changelog` version is what gets released, with `trixie` as the distribution.
 - `maintainers.yaml` and `keys/`: the people whose signatures are trusted for this project (see [Signing and trust](trust.md)).
+
+`moos-ivp-helm` is the IvP helm libraries built without MOOS (`IVP_BUILD_HELM_LIBS_ONLY`, from MOOS-IvP master with [moos-ivp/moos-ivp#147](https://github.com/moos-ivp/moos-ivp/pull/147)), installed under `/usr/lib/<multiarch>/ivp-helm` so they coexist with the `libmoos-ivp` packages; `find_package(IVP CONFIG)` finds them with that prefix in `CMAKE_PREFIX_PATH`. The branch has no tags of its own, so the project is snapshots only.
 
 A `project.yaml` for a project with signed tags `v1.2.0` and prereleases `v1.3.0-rc.1`:
 
@@ -41,6 +44,8 @@ install_test:
   commands:
     - example --version
 ```
+
+A project that only builds snapshots of a branch sets `release.enabled: false` (a changelog change releases nothing) and `continuous.enabled: true`, with `continuous.branch` if the branch isn't the repository's default. Its pull request checks build the branch head instead of the changelog version. Versions come from the last tag reachable from the head; where none is (a fork without tags, or a branch upstream tags elsewhere), `continuous.version_base` names the release the snapshots follow.
 
 `ci/project-config <project> get <setting>` shows the merged settings, and `ci/project-config <project> matrix` the build targets. To build locally, see the top of the `Makefile`:
 

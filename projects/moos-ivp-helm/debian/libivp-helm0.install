@@ -1,0 +1,2 @@
+usr/lib/*/ivp-helm/lib/lib*.so.*
+etc/ld.so.conf.d

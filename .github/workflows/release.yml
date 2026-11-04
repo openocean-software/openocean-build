@@ -58,6 +58,10 @@ jobs:
           # Each project's channel comes from its changelog version's upstream tag.
           releases=()
           for project in "${projects[@]}"; do
+            if [ "$(ci/project-config "${project}" get release.enabled)" != true ]; then
+              echo "${project}: release.enabled is false, nothing to release"
+              continue
+            fi
             channel=$(ci/project-config "${project}" channel)
             echo "${project} $(ci/project-config "${project}" release-tag) -> ${channel}"
             releases+=("${project}:${channel}")

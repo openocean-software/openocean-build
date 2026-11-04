@@ -75,6 +75,8 @@ def validate(project, config, root=ROOT):
             raise ConfigError(f"{project}: release.beta_tags isn't a valid regular expression: {e}")
         if "beta" not in config["channels"]:
             raise ConfigError(f"{project}: release.beta_tags needs a beta channel in defaults.yaml")
+    if not config["release"].get("enabled", True) and not config["continuous"]["enabled"]:
+        raise ConfigError(f"{project}: release.enabled false needs continuous.enabled")
     if config["continuous"]["enabled"]:
         if config["source"] != "git":
             raise ConfigError(f"{project}: continuous builds need source git")
@@ -160,6 +162,8 @@ def continuous_version(project, config, git_dir, commit, root=ROOT):
     Sorts above the last tag's release and below the next one. The commit count
     only grows along the default branch, and the revision changes whenever
     projects/<project>/ changes, so a packaging change gets a new version.
+    Without a reachable tag the base is continuous.version_base (or 0) and the
+    count is the whole history's.
     """
     def git(*args, cwd=git_dir):
         return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout.strip()
@@ -168,7 +172,7 @@ def continuous_version(project, config, git_dir, commit, root=ROOT):
     pattern = config["upstream"]["tag_format"].replace("{version}", "*")
     tags = [t for t in git("tag", "--merged", commit, "--list", pattern, "--sort=-creatordate").splitlines()
             if tag_version(config, t)]
-    base, count = "0", git("rev-list", "--count", commit)
+    base, count = config["continuous"].get("version_base") or "0", git("rev-list", "--count", commit)
     if tags:
         # The nearest tag by commit distance, as git describe picks it
         distances = {t: int(git("rev-list", "--count", f"{t}..{commit}")) for t in tags}
