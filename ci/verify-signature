@@ -23,6 +23,7 @@ import json
 import os
 import re
 import subprocess
+import urllib.error
 import urllib.request
 import sys
 import tempfile
@@ -156,8 +157,11 @@ def github_api(path):
     request = urllib.request.Request(f"{base}/{path}", headers={"Accept": "application/vnd.github+json"})
     if os.environ.get("GITHUB_TOKEN") and base.startswith("https://"):
         request.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.URLError as e:
+        raise VerifyError(f"GitHub API request for {path} failed: {e}")
 
 
 def signer(maintainers, output, ref, project):

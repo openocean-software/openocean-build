@@ -225,6 +225,16 @@ class VerifySignatureTest(unittest.TestCase):
         self.github_api(sha, merged_by="maint", merge_commit_sha="0" * 40)
         self.assertRejected(self.verify_github("p", sha), "no merged pull request")
 
+    def test_github_api_failure_is_a_rejection_not_a_crash(self):
+        fpr, armored = self.gpg_key("maint@example.org")
+        self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
+        sha = self.github_merge_commit()
+        # No recorded answers, so the API request fails as a 403 or outage would
+        self.env["VERIFY_SIGNATURE_GITHUB_API"] = f"file://{self.tmp / 'no-api'}"
+        result = self.verify_github("p", sha)
+        self.assertRejected(result, "GitHub API request")
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_github_key_with_another_committer_is_rejected(self):
         fpr, armored = self.gpg_key("maint@example.org")
         self.project("p", f"maintainers:\n  - name: Maint\n    github: maint\n    gpg: [{fpr}]\n", [armored])
