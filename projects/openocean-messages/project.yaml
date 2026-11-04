@@ -10,6 +10,8 @@ release:
 
 continuous:
   enabled: true
+  # Its notify-openocean-build.yml starts continuous.yml on each push to main
+  push_dispatch: true
 
 targets:
   exclude:
