@@ -138,8 +138,8 @@ def upstream_version(project, root=ROOT):
 
 
 def release_tag(config, version):
-    """Upstream tags have no repack suffix (+dfsg, +ds), and use "-" where Debian uses "~"."""
-    tag_version = re.sub(r"\+(dfsg|ds)[0-9]*$", "", version).replace("~", "-")
+    """Upstream tags have no repack suffix (+dfsg, +ds), and use prerelease_separator where Debian uses "~"."""
+    tag_version = re.sub(r"\+(dfsg|ds)[0-9]*$", "", version).replace("~", config["upstream"]["prerelease_separator"])
     return config["upstream"]["tag_format"].replace("{version}", tag_version)
 
 
@@ -148,7 +148,10 @@ def tag_version(config, tag):
     prefix, suffix = config["upstream"]["tag_format"].split("{version}")
     if not (tag.startswith(prefix) and tag.endswith(suffix)):
         return None
-    return tag[len(prefix):len(tag) - len(suffix) or None].replace("-", "~")
+    version = tag[len(prefix):len(tag) - len(suffix) or None]
+    if not re.match(r"[0-9]", version):
+        return None
+    return version.replace(config["upstream"]["prerelease_separator"], "~")
 
 
 def continuous_version(project, config, git_dir, commit, root=ROOT):

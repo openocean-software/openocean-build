@@ -6,6 +6,7 @@ Run from the repository root:
 
 import importlib.machinery
 import importlib.util
+import subprocess
 import tempfile
 import textwrap
 import unittest
@@ -30,6 +31,7 @@ channels:
   beta: { prefix: beta/, environment: release }
 upstream:
   tag_format: "v{version}"
+  prerelease_separator: "-"
 release:
   require_signed_tag: false
   beta_tags: null
@@ -157,6 +159,18 @@ class ProjectConfigTest(unittest.TestCase):
         config = self.load(self.project("p", 'source: uscan\nupstream:\n  tag_format: "release-{version}"\n'))
         self.assertEqual(project_config.release_tag(config, "3.1"), "release-3.1")
 
+    def test_prerelease_separator_is_per_project(self):
+        config = self.load(self.project("p", """
+            source: uscan
+            upstream:
+              tag_format: "{version}"
+              prerelease_separator: _
+            """))
+        self.assertEqual(project_config.release_tag(config, "5.0.0~alpha2"), "5.0.0_alpha2")
+        self.assertEqual(project_config.tag_version(config, "5.0.0_alpha2"), "5.0.0~alpha2")
+        # Tags that aren't versions are ignored, even when tag_format has no prefix to tell them apart
+        self.assertIsNone(project_config.tag_version(config, "debian-5.1.1"))
+
     def test_channel_is_beta_only_for_matching_tags(self):
         config = self.load(self.project("p", """
             source: uscan
@@ -200,6 +214,15 @@ class ProjectConfigTest(unittest.TestCase):
         for name in project_config.list_projects():
             with self.subTest(project=name):
                 project_config.load(name)
+
+    def test_every_real_project_is_named_after_its_source_package(self):
+        # The Makefile, fetch-source and continuous-heads all find a project's files by its source package name
+        for name in project_config.list_projects():
+            with self.subTest(project=name):
+                changelog = ROOT / "projects" / name / "debian" / "changelog"
+                source = subprocess.run(["dpkg-parsechangelog", "-l", str(changelog), "-S", "Source"],
+                                        check=True, capture_output=True, text=True).stdout.strip()
+                self.assertEqual(source, name)
 
 
 if __name__ == "__main__":
