@@ -31,7 +31,7 @@ on:
         type: string
         required: true
       channel:
-        description: Channel in defaults.yaml to publish to
+        description: Channel in defaults.yaml to publish to, whose build_against channels supply build_depends.projects
         type: string
         default: release
       publish:
@@ -130,6 +130,7 @@ jobs:
         env:
           SOURCE_REF: ${{ inputs.source_ref }}
           VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
           set -euo pipefail
           args=()
@@ -138,7 +139,7 @@ jobs:
               "Continuous build of ${PROJECT} ${SOURCE_REF:0:7}."
             args+=(DEBIAN_DIR="${RUNNER_TEMP}/staged/debian" SOURCE_REF="${SOURCE_REF}")
           fi
-          make debian-sbuild OOS_PACKAGE="${PROJECT}" DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} "${args[@]}"
+          make debian-sbuild OOS_PACKAGE="${PROJECT}" CHANNEL="${CHANNEL}" DISTRO=${{ matrix.distro }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} "${args[@]}"
 
       - name: Upload built packages
         uses: actions/upload-artifact@v4
@@ -156,6 +157,15 @@ jobs:
         with:
           name: src_${{ inputs.project }}
           path: build/${{ inputs.project }}/*.orig.tar.*
+          if-no-files-found: error
+
+      # So the install test installs dependencies from the same sources the build used
+      - name: Upload apt sources for the install test
+        if: matrix.install_test
+        uses: actions/upload-artifact@v4
+        with:
+          name: sources_${{ inputs.project }}
+          path: build/${{ inputs.project }}/${{ matrix.distro }}-${{ matrix.dist }}-${{ matrix.arch }}-sources
           if-no-files-found: error
 
   install-test:
@@ -182,6 +192,12 @@ jobs:
           name: src_${{ inputs.project }}
           path: source
 
+      - name: Download apt sources
+        uses: actions/download-artifact@v4
+        with:
+          name: sources_${{ inputs.project }}
+          path: sources
+
       - name: Install and check
         env:
           INSTALL_SCRIPT: ${{ needs.config.outputs.install_script }}
@@ -192,7 +208,7 @@ jobs:
           set -euo pipefail
           printf '%s\n' "${INSTALL_SCRIPT}" > "${RUNNER_TEMP}/install-checks.sh"
           tarballs=(source/*.orig.tar.*)
-          args=(debs "${RUNNER_TEMP}/install-checks.sh" "${tarballs[0]}")
+          args=(--apt-config sources/apt debs "${RUNNER_TEMP}/install-checks.sh" "${tarballs[0]}")
           if [ -f "${KEY}" ]; then
             args+=("${APT_URL%/}/${PREFIX}${DISTRO}-${DIST}" "${DIST}" "${KEY}")
           else

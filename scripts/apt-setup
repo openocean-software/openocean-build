@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Adds Open Ocean Software's apt channels, and the external repositories some
+# of our packages need, to a Debian or Ubuntu system.
+#
+# Usage: sudo apt-setup [--beta] [--continuous] [--zenoh]
+#
+#   (always)      the release channel
+#   --beta        the beta channel (prereleases)
+#   --continuous  the continuous channel (builds of each project's latest commit)
+#   --zenoh       Eclipse Zenoh's repository, pinned to the version our packages
+#                 are built against (for goby3-zenoh and the like)
+#
+# Each key is downloaded and checked against the fingerprint below before apt
+# is told to trust it. Run it again to add more; it rewrites what it wrote.
+set -euo pipefail
+
+KEYS_URL=${OPENOCEAN_KEYS_URL:-https://raw.githubusercontent.com/openocean-software/openocean-build/main}
+APT_URL=https://apt.oceansoft.org
+
+# Keep in sync with defaults.yaml (ci/tests checks they match)
+declare -A KEY_PATH=(
+    [release]=keys/release.asc
+    [beta]=keys/release.asc
+    [continuous]=keys/continuous.asc
+    [zenoh]=trust/zenoh.asc
+)
+declare -A KEY_FINGERPRINT=(
+    [release]=D7D7224D53A4F29E303FE01DEB505B68A5D063B0
+    [beta]=D7D7224D53A4F29E303FE01DEB505B68A5D063B0
+    [continuous]=DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
+    [zenoh]=0ABC5913672BBE50921B3B9395D19EA1F7DF9E8E
+)
+ZENOH_URL=https://download.eclipse.org/zenoh/debian-repo/
+ZENOH_SUITE=/
+ZENOH_PIN_PACKAGES="libzenohc libzenohc-dev libzenohcpp-dev"
+ZENOH_PIN_VERSION=1.10.2
+
+usage() {
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' >&2
+    exit "${1:-0}"
+}
+
+channels=(release)
+zenoh=false
+for arg in "$@"; do
+    case "${arg}" in
+        --beta) channels+=(beta) ;;
+        --continuous) channels+=(continuous) ;;
+        --zenoh) zenoh=true ;;
+        -h|--help) usage ;;
+        *) echo "apt-setup: unknown option ${arg}" >&2; usage 1 ;;
+    esac
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "apt-setup: run as root (sudo)" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+. /etc/os-release
+case "${ID}" in
+    debian|ubuntu) ;;
+    *) echo "apt-setup: ${ID} isn't Debian or Ubuntu" >&2; exit 1 ;;
+esac
+dist=${VERSION_CODENAME:?/etc/os-release has no VERSION_CODENAME}
+
+missing=()
+command -v curl > /dev/null || missing+=(curl)
+command -v gpg > /dev/null || missing+=(gnupg)
+[ -f /etc/ssl/certs/ca-certificates.crt ] || missing+=(ca-certificates)
+if [ ${#missing[@]} -gt 0 ]; then
+    apt-get update
+    apt-get install -y --no-install-recommends "${missing[@]}"
+fi
+
+# install_key <name> <keyring>: download the key and check its fingerprint
+install_key() {
+    local tmp
+    tmp=$(mktemp)
+    curl -fsSL "${KEYS_URL}/${KEY_PATH[$1]}" -o "${tmp}"
+    if ! gpg --show-keys --with-colons "${tmp}" 2> /dev/null | grep -qx "fpr:::::::::${KEY_FINGERPRINT[$1]}:"; then
+        echo "apt-setup: the $1 key doesn't have fingerprint ${KEY_FINGERPRINT[$1]}; not installing it" >&2
+        rm -f "${tmp}"
+        exit 1
+    fi
+    install -D -m 0644 "${tmp}" "$2"
+    rm -f "${tmp}"
+}
+
+for channel in "${channels[@]}"; do
+    keyring=/usr/share/keyrings/openocean-${channel}.asc
+    install_key "${channel}" "${keyring}"
+    printf 'Types: deb\nURIs: %s/%s/%s-%s\nSuites: %s\nComponents: main\nSigned-By: %s\n' \
+        "${APT_URL}" "${channel}" "${ID}" "${dist}" "${dist}" "${keyring}" \
+        > "/etc/apt/sources.list.d/openocean-${channel}.sources"
+    echo "Added the ${channel} channel for ${ID} ${dist}"
+done
+
+if [ "${zenoh}" = true ]; then
+    keyring=/usr/share/keyrings/eclipse-zenoh.asc
+    install_key zenoh "${keyring}"
+    printf 'Types: deb\nURIs: %s\nSuites: %s\nSigned-By: %s\n' "${ZENOH_URL}" "${ZENOH_SUITE}" "${keyring}" \
+        > /etc/apt/sources.list.d/eclipse-zenoh.sources
+    printf 'Package: %s\nPin: version %s\nPin-Priority: 1001\n' "${ZENOH_PIN_PACKAGES}" "${ZENOH_PIN_VERSION}" \
+        > /etc/apt/preferences.d/eclipse-zenoh.pref
+    echo "Added Eclipse Zenoh's repository, pinned to ${ZENOH_PIN_VERSION}"
+fi
+
+apt-get update

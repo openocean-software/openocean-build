@@ -26,9 +26,20 @@ targets:
   dists:
     - { distro: debian, dist: trixie }
     - { distro: ubuntu, dist: resolute }
+apt_url: https://apt.example.org
 channels:
-  release: { prefix: release/, environment: release }
-  beta: { prefix: beta/, environment: release }
+  release: { prefix: release/, environment: release, key: keys/release.asc, build_against: [release] }
+  beta: { prefix: beta/, environment: release, key: keys/release.asc, build_against: [release, beta] }
+repositories:
+  ext:
+    url: https://ext.example.org/{distro}/
+    suite: "{dist}"
+    components: [main]
+    key: trust/ext.asc
+    pin: { packages: [libext, libext-dev], version: 1.2.3 }
+build_depends:
+  projects: []
+  repositories: []
 upstream:
   tag_format: "v{version}"
   prerelease_separator: "-"
@@ -53,10 +64,13 @@ class ProjectConfigTest(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         (self.root / "defaults.yaml").write_text(DEFAULTS)
+        for key in ("keys/release.asc", "trust/ext.asc"):
+            (self.root / key).parent.mkdir(exist_ok=True)
+            (self.root / key).write_text(f"-----BEGIN PGP PUBLIC KEY BLOCK-----\n{key}\n")
 
     def project(self, name, project_yaml, changelog=True):
         d = self.root / "projects" / name
-        (d / "debian").mkdir(parents=True)
+        (d / "debian").mkdir(parents=True, exist_ok=True)
         (d / "project.yaml").write_text(textwrap.dedent(project_yaml))
         if changelog:
             (d / "debian" / "changelog").write_text("")
@@ -199,7 +213,8 @@ class ProjectConfigTest(unittest.TestCase):
             project_config.channel(config, "0.1.0~alpha.1")
 
     def test_beta_tags_needs_a_beta_channel(self):
-        (self.root / "defaults.yaml").write_text(DEFAULTS.replace("  beta: { prefix: beta/, environment: release }\n", ""))
+        (self.root / "defaults.yaml").write_text(DEFAULTS.replace(
+            "  beta: { prefix: beta/, environment: release, key: keys/release.asc, build_against: [release, beta] }\n", ""))
         with self.assertRaisesRegex(project_config.ConfigError, "beta channel"):
             self.load(self.project("p", "source: uscan\nrelease:\n  beta_tags: beta\n"))
 
@@ -216,6 +231,98 @@ class ProjectConfigTest(unittest.TestCase):
     def test_continuous_builds_need_git_source(self):
         with self.assertRaisesRegex(project_config.ConfigError, "continuous builds need source git"):
             self.load(self.project("p", "source: uscan\ncontinuous:\n  enabled: true\n"))
+
+    def test_build_depends_must_name_projects_and_repositories(self):
+        self.project("dep", "source: uscan\n")
+        for yaml_text, error in [
+            ("build_depends:\n  projects: [nope]\n", "nope, which isn't a project"),
+            ("build_depends:\n  projects: [p]\n", "names the project itself"),
+            ("build_depends:\n  repositories: [nope]\n", "nope, which isn't in repositories"),
+        ]:
+            with self.subTest(yaml=yaml_text), self.assertRaisesRegex(project_config.ConfigError, error):
+                self.load(self.project("p", "source: uscan\n" + yaml_text))
+        self.load(self.project("p", "source: uscan\nbuild_depends:\n  projects: [dep]\n  repositories: [ext]\n"))
+
+    def test_a_dependency_must_build_every_target_its_dependent_does(self):
+        self.project("dep", "source: uscan\ntargets:\n  exclude:\n    - { distro: debian, dist: trixie, arch: arm64 }\n")
+        with self.assertRaisesRegex(project_config.ConfigError, "builds debian/trixie/arm64, which dep doesn't"):
+            self.load(self.project("p", "source: uscan\nbuild_depends:\n  projects: [dep]\n"))
+        # Building fewer targets than the dependency is fine
+        self.load(self.project("p", "source: uscan\nbuild_depends:\n  projects: [dep]\n"
+                                    "targets:\n  exclude:\n    - { distro: debian, dist: trixie }\n"))
+
+    def test_build_order_puts_dependencies_first_even_through_other_projects(self):
+        self.project("a", "source: uscan\nbuild_depends:\n  projects: [b]\n")
+        self.project("b", "source: uscan\nbuild_depends:\n  projects: [c]\n")
+        self.project("c", "source: uscan\n")
+        self.project("d", "source: uscan\n")
+        self.assertEqual(project_config.build_order(["a", "d", "c"], root=self.root), ["c", "a", "d"])
+        self.assertEqual(project_config.release_conflicts(["a", "c", "d"], root=self.root), [("c", "a")])
+        self.assertEqual(project_config.release_conflicts(["b", "d"], root=self.root), [])
+
+    def test_build_order_reports_a_cycle(self):
+        self.project("a", "source: uscan\nbuild_depends:\n  projects: [b]\n")
+        self.project("b", "source: uscan\nbuild_depends:\n  projects: [a]\n")
+        with self.assertRaisesRegex(project_config.ConfigError, "cycle: a -> b -> a"):
+            project_config.build_order(["a"], root=self.root)
+
+    def test_no_build_depends_needs_no_sources(self):
+        config = self.load(self.project("p", "source: uscan\n"))
+        self.assertEqual(project_config.build_sources("p", config, "beta", "ubuntu", "resolute",
+                                                      probe=lambda url, dist: True), [])
+
+    def test_sources_are_the_published_build_against_channels_and_named_repositories(self):
+        self.project("dep", "source: uscan\n")
+        config = self.load(self.project("p", "source: uscan\nbuild_depends:\n  projects: [dep]\n  repositories: [ext]\n"))
+        # The beta channel hasn't reached this release yet, so only release is used
+        sources = project_config.build_sources("p", config, "beta", "ubuntu", "resolute",
+                                               probe=lambda url, dist: "/beta/" not in url)
+        self.assertEqual([(s["name"], s["uri"], s["suite"], s["components"]) for s in sources], [
+            ("openocean-release", "https://apt.example.org/release/ubuntu-resolute", "resolute", ["main"]),
+            ("ext", "https://ext.example.org/ubuntu/", "resolute", ["main"]),
+        ])
+        self.assertEqual(sources[1]["pin"], {"packages": ["libext", "libext-dev"], "version": "1.2.3"})
+
+    def test_sources_are_written_for_apt_and_for_sbuild(self):
+        self.project("dep", "source: uscan\n")
+        config = self.load(self.project("p", "source: uscan\nbuild_depends:\n  projects: [dep]\n  repositories: [ext]\n"))
+        sources = project_config.build_sources("p", config, "release", "debian", "trixie", probe=lambda url, dist: True)
+        out = self.root / "out"
+        project_config.write_sources(sources, out, "/sources", root=self.root)
+        apt = out / "apt"
+        self.assertEqual((apt / "sources.list.d" / "ext.sources").read_text(),
+                         "Types: deb\nURIs: https://ext.example.org/debian/\nSuites: trixie\nComponents: main\n"
+                         "Signed-By: /etc/apt/keyrings/ext.asc\n")
+        self.assertIn("trust/ext.asc", (apt / "keyrings" / "ext.asc").read_text())
+        self.assertEqual((apt / "preferences.d" / "ext.pref").read_text(),
+                         "Package: libext libext-dev\nPin: version 1.2.3\nPin-Priority: 1001\n")
+        self.assertFalse((apt / "preferences.d" / "openocean-release.pref").exists())
+        # sbuild evaluates its configuration as Perl, with these variables already declared
+        perl = r"""
+            use strict; use warnings;
+            my $extra_repositories = []; my $extra_repository_keys = [];
+            my $external_commands = {"chroot-setup-commands" => []};
+            my $e = eval `cat "$ARGV[0]"`; die $@ unless defined $e;
+            print join("\n", @$extra_repositories), "\n--\n", join("\n", @$extra_repository_keys), "\n--\n";
+            print $_ for @{$external_commands->{"chroot-setup-commands"}};
+        """
+        out_text = subprocess.run(["perl", "-e", perl, str(out / "sbuild.conf")], check=True,
+                                  capture_output=True, text=True).stdout
+        repositories, keys, commands = out_text.split("\n--\n")
+        self.assertEqual(repositories.splitlines(), [
+            "deb https://apt.example.org/release/debian-trixie trixie main",
+            "deb https://ext.example.org/debian/ trixie main",
+        ])
+        self.assertEqual(keys.splitlines(), ["/sources/apt/keyrings/openocean-release.asc",
+                                             "/sources/apt/keyrings/ext.asc"])
+        # The pin is written inside the chroot by a command sbuild runs with /bin/sh -c
+        script = commands.replace("%%", "%")
+        self.assertNotRegex(commands.replace("%%", ""), "%", "sbuild would expand a lone %")
+        written = subprocess.run(["sh", "-c", script.replace("/etc/apt/preferences.d", str(self.root / "pref"))],
+                                 check=True, capture_output=True, text=True)
+        self.assertEqual(written.returncode, 0)
+        self.assertEqual((self.root / "pref" / "ext.pref").read_text(),
+                         "Package: libext libext-dev\nPin: version 1.2.3\nPin-Priority: 1001\n")
 
     def test_every_real_project_loads(self):
         for name in project_config.list_projects():

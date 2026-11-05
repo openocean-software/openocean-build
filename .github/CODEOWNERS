@@ -3,6 +3,8 @@
 /projects/*/maintainers.yaml @tsaubergine
 /projects/*/keys/ @tsaubergine
 /keys/ @tsaubergine
+/trust/ @tsaubergine
+/scripts/ @tsaubergine
 /defaults.yaml @tsaubergine
 /ci/ @tsaubergine
 /.github/ @tsaubergine

@@ -45,6 +45,9 @@ RUN apt-get update && \
 # (apt to install build-deps, passwd for schroot's session setup), so
 # request them explicitly rather than relying on variant/suite-dependent
 # luck.
+#
+# --include=ca-certificates: build_depends can add https apt sources (our
+# channels, external repositories), which apt can only verify with it.
 RUN case "${DISTRO}" in \
         debian) MIRROR=http://deb.debian.org/debian; COMPONENTS=main ;; \
         ubuntu) \
@@ -56,7 +59,7 @@ RUN case "${DISTRO}" in \
         *) echo "Unsupported DISTRO '${DISTRO}'" >&2; exit 1 ;; \
     esac; \
     mkdir -p /srv/chroot/${DIST}-${ARCH} && \
-    mmdebstrap --arch=${ARCH} --variant=buildd --include=apt,passwd --components="${COMPONENTS}" "${DIST}" \
+    mmdebstrap --arch=${ARCH} --variant=buildd --include=apt,passwd,ca-certificates --components="${COMPONENTS}" "${DIST}" \
         /srv/chroot/${DIST}-${ARCH} \
         "${MIRROR}"
 
