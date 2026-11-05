@@ -12,8 +12,9 @@ upstream default branch (or continuous.branch) and keeps it if
 --polled-only leaves out projects that notify on each push (continuous.push_dispatch).
 --unverified keeps every head, for a check that builds without publishing.
 
-Prints a JSON list of {"project", "sha", "version"}. Heads it skips, and why,
-go to stderr and to $GITHUB_STEP_SUMMARY when set.
+Prints a JSON list of {"project", "sha", "version"}, each project after those
+it build-depends on. Heads it skips, and why, go to stderr and to
+$GITHUB_STEP_SUMMARY when set.
 """
 
 import argparse
@@ -150,7 +151,7 @@ def main():
 
     builds = []
     with tempfile.TemporaryDirectory() as tmp:
-        for project in selected:
+        for project in project_config.build_order(selected):
             build = head_to_build(project, configs[project], Path(tmp), unverified=args.unverified)
             if build:
                 builds.append(build)

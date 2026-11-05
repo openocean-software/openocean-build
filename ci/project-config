@@ -12,13 +12,26 @@ Usage:
   project-config <project> channel          channel that version publishes to (beta or release)
   project-config <project> continuous-version <git-dir> <commit>
                                             Debian version for a continuous build of <commit>
+  project-config <project> sources <channel> <distro> <dist> <dir> [--mounted-at <path>]
+                                            writes the apt sources a build for <channel> needs
+                                            besides the distribution's: <dir>/apt (to copy over
+                                            /etc/apt) and <dir>/sbuild.conf (for SBUILD_CONFIG,
+                                            with <dir> seen at <path>)
+  project-config order <project>...         JSON list of the projects, each after those it
+                                            build-depends on
+  project-config release-conflicts <project>...
+                                            fails if one project build-depends on another,
+                                            since both can't be released by one pull request
 """
 
 import json
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import yaml
@@ -96,6 +109,33 @@ def validate(project, config, root=ROOT):
     install = config["install_test"]["target"]
     if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")
+    validate_build_depends(project, config, root)
+
+
+def validate_build_depends(project, config, root=ROOT):
+    for name in config["build_depends"]["repositories"]:
+        repository = (config.get("repositories") or {}).get(name)
+        if not repository:
+            raise ConfigError(f"{project}: build_depends.repositories names {name}, which isn't in repositories")
+        if not (root / repository["key"]).is_file():
+            raise ConfigError(f"{project}: repository {name}'s key {repository['key']} doesn't exist")
+    for channel_settings in config["channels"].values():
+        for other in channel_settings.get("build_against", []):
+            if other not in config["channels"]:
+                raise ConfigError(f"{project}: build_against names {other}, which isn't a channel")
+    targets = {(t["distro"], t["dist"], t["arch"]) for t in matrix(config)}
+    for dependency in config["build_depends"]["projects"]:
+        if dependency == project:
+            raise ConfigError(f"{project}: build_depends.projects names the project itself")
+        if not (root / "projects" / dependency / "project.yaml").is_file():
+            raise ConfigError(f"{project}: build_depends.projects names {dependency}, which isn't a project")
+        # Merged without validating, so a cycle can't recurse forever (build_order reports it)
+        dependency_config = merge(load_yaml(root / "defaults.yaml"),
+                                  load_yaml(root / "projects" / dependency / "project.yaml"))
+        missing = targets - {(t["distro"], t["dist"], t["arch"]) for t in matrix(dependency_config)}
+        if missing:
+            listed = ", ".join("/".join(t) for t in sorted(missing))
+            raise ConfigError(f"{project}: builds {listed}, which {dependency} doesn't")
 
 
 def get(config, key_path):
@@ -130,6 +170,139 @@ def install_script(config):
         lines.append(shlex.join(["apt-get", "install", "-y", "--no-install-recommends", *packages]))
     lines += config["install_test"]["commands"]
     return "\n".join(lines) + "\n"
+
+
+def build_order(projects, root=ROOT):
+    """The projects, each after the ones it build-depends on, directly or through others."""
+    depends = {}
+    for project in list_projects(root / "projects"):
+        config = merge(load_yaml(root / "defaults.yaml"), load_yaml(root / "projects" / project / "project.yaml"))
+        depends[project] = set(config.get("build_depends", {}).get("projects") or [])
+    order, done, visiting = [], set(), []
+
+    def visit(project):
+        if project in done:
+            return
+        if project in visiting:
+            cycle = " -> ".join(visiting[visiting.index(project):] + [project])
+            raise ConfigError(f"build_depends.projects has a cycle: {cycle}")
+        visiting.append(project)
+        for dependency in sorted(depends.get(project, ())):
+            visit(dependency)
+        visiting.pop()
+        done.add(project)
+        order.append(project)
+
+    for project in sorted(depends):
+        visit(project)
+    unknown = [p for p in projects if p not in depends]
+    if unknown:
+        raise ConfigError(f"no project {', '.join(unknown)}")
+    wanted = set(projects)
+    return [p for p in order if p in wanted]
+
+
+def _all_dependencies(project, root=ROOT):
+    seen, todo = set(), [project]
+    while todo:
+        config = merge(load_yaml(root / "defaults.yaml"), load_yaml(root / "projects" / todo.pop() / "project.yaml"))
+        for dependency in config.get("build_depends", {}).get("projects") or []:
+            if dependency not in seen:
+                seen.add(dependency)
+                todo.append(dependency)
+    return seen
+
+
+def release_conflicts(projects, root=ROOT):
+    """Pairs (dependency, dependent) among projects."""
+    return [(dependency, project) for project in sorted(projects) for dependency in sorted(projects)
+            if dependency in _all_dependencies(project, root)]
+
+
+def channel_url(config, channel_name, distro, dist):
+    return f"{config['apt_url'].rstrip('/')}/{config['channels'][channel_name]['prefix']}{distro}-{dist}"
+
+
+def published(url, dist):
+    """Whether an apt repository has a Release file for dist."""
+    try:
+        with urllib.request.urlopen(f"{url}/dists/{dist}/Release", timeout=30):
+            return True
+    except urllib.error.HTTPError as e:
+        # S3 behind CloudFront answers 403 for a key that doesn't exist yet
+        if e.code in (403, 404):
+            return False
+        raise
+
+
+def build_sources(project, config, channel_name, distro, dist, probe=published):
+    """The apt sources a build of project for channel_name needs besides the distribution's.
+
+    Each is {name, uri, suite, components, key, pin}. Our channels come first, in
+    build_against's order, and only those already published for dist: a beta
+    build for a release no beta has reached yet still finds release's packages.
+    """
+    sources = []
+    if config["build_depends"]["projects"]:
+        for name in config["channels"][channel_name].get("build_against", [channel_name]):
+            uri = channel_url(config, name, distro, dist)
+            if probe(uri, dist):
+                sources.append({"name": f"openocean-{name}", "uri": uri, "suite": dist, "components": ["main"],
+                                "key": config["channels"][name]["key"], "pin": None})
+    for name in config["build_depends"]["repositories"]:
+        repository = config["repositories"][name]
+
+        def expand(text):
+            return text.replace("{distro}", distro).replace("{dist}", dist)
+        sources.append({"name": name, "uri": expand(repository["url"]).rstrip("/") + "/",
+                        "suite": expand(repository["suite"]), "components": repository.get("components") or [],
+                        "key": repository["key"], "pin": repository.get("pin")})
+    return sources
+
+
+def _perl_string(text):
+    return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def write_sources(sources, directory, mounted_at=None, root=ROOT):
+    """<directory>/apt mirrors /etc/apt (sources.list.d, keyrings, preferences.d);
+    <directory>/sbuild.conf adds the same to an sbuild build, with directory seen at mounted_at."""
+    directory = Path(directory)
+    mounted_at = str(mounted_at or directory.resolve())
+    if (directory / "apt").exists():
+        shutil.rmtree(directory / "apt")
+    for sub in ("sources.list.d", "keyrings", "preferences.d"):
+        (directory / "apt" / sub).mkdir(parents=True)
+    lines, keys, preferences = [], [], []
+    for source in sources:
+        name = source["name"]
+        keyring = directory / "apt" / "keyrings" / f"{name}.asc"
+        shutil.copyfile(root / source["key"], keyring)
+        keyring.chmod(0o644)
+        deb822 = ["Types: deb", f"URIs: {source['uri']}", f"Suites: {source['suite']}"]
+        if source["components"]:
+            deb822.append(f"Components: {' '.join(source['components'])}")
+        deb822.append(f"Signed-By: /etc/apt/keyrings/{name}.asc")
+        (directory / "apt" / "sources.list.d" / f"{name}.sources").write_text("\n".join(deb822) + "\n")
+        lines.append(" ".join(["deb", source["uri"], source["suite"], *source["components"]]))
+        keys.append(f"{mounted_at}/apt/keyrings/{name}.asc")
+        if source["pin"]:
+            preference = (f"Package: {' '.join(source['pin']['packages'])}\n"
+                          f"Pin: version {source['pin']['version']}\nPin-Priority: 1001\n")
+            (directory / "apt" / "preferences.d" / f"{name}.pref").write_text(preference)
+            preferences.append((name, preference))
+    conf = ["# Written by ci/project-config: the apt sources this build needs besides the distribution's"]
+    conf.append(f"$extra_repositories = [{', '.join(_perl_string(l) for l in lines)}];")
+    conf.append(f"$extra_repository_keys = [{', '.join(_perl_string(k) for k in keys)}];")
+    for name, preference in preferences:
+        script = (f"mkdir -p /etc/apt/preferences.d && cat > /etc/apt/preferences.d/{name}.pref <<'PREF'\n"
+                  f"{preference}PREF\n")
+        # sbuild expands %-escapes in commands (%% is a literal %), and in
+        # schroot mode runs a command string with /bin/sh -c
+        script = script.replace("%", "%%")
+        conf.append(f"push(@{{$external_commands->{{'chroot-setup-commands'}}}}, {_perl_string(script)});")
+    conf.append("1;")
+    (directory / "sbuild.conf").write_text("\n".join(conf) + "\n")
 
 
 def upstream_version(project, root=ROOT):
@@ -215,6 +388,21 @@ def main(argv):
     if len(argv) == 4 and argv[1] == "continuous-version":
         print(continuous_version(argv[0], load(argv[0]), argv[2], argv[3]))
         return
+    if len(argv) in (6, 8) and argv[1] == "sources" and (len(argv) == 6 or argv[6] == "--mounted-at"):
+        config = load(argv[0])
+        if argv[2] not in config["channels"]:
+            raise ConfigError(f"no channel {argv[2]}")
+        write_sources(build_sources(argv[0], config, *argv[2:5]), argv[5], argv[7] if len(argv) == 8 else None)
+        return
+    if argv and argv[0] == "order":
+        print(json.dumps(build_order(argv[1:])))
+        return
+    if argv and argv[0] == "release-conflicts":
+        conflicts = release_conflicts(argv[1:])
+        for dependency, dependent in conflicts:
+            print(f"{dependent} build-depends on {dependency}: release {dependency} first, "
+                  f"then {dependent} in another pull request", file=sys.stderr)
+        sys.exit(1 if conflicts else 0)
     sys.exit(__doc__)
 
 

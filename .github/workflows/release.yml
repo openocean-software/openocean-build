@@ -55,6 +55,10 @@ jobs:
           else
             mapfile -t projects < <(git diff --name-only "${BEFORE}" "${GITHUB_SHA}" -- 'projects/*/debian/changelog' | cut -d/ -f2 | sort -u)
           fi
+          # Dependencies first: the matrix runs one release at a time, in this order
+          if [ ${#projects[@]} -gt 0 ]; then
+            mapfile -t projects < <(ci/project-config order "${projects[@]}" | python3 -c 'import json, sys; print(*json.load(sys.stdin), sep="\n")')
+          fi
           # Each project's channel comes from its changelog version's upstream tag.
           releases=()
           for project in "${projects[@]}"; do

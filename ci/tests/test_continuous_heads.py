@@ -52,7 +52,8 @@ class ContinuousHeadsTest(unittest.TestCase):
         run("git", "-C", repo, "commit", "-q", *(["-S" + self.maint] if signed else []), "-m", "one", env=self.env)
         return repo
 
-    def project(self, name, upstream, enabled=True, push_dispatch=False, branch=None, version_base=None):
+    def project(self, name, upstream, enabled=True, push_dispatch=False, branch=None, version_base=None,
+                build_depends=()):
         d = self.root / "projects" / name
         (d / "debian").mkdir(parents=True)
         (d / "keys").mkdir()
@@ -66,6 +67,8 @@ class ContinuousHeadsTest(unittest.TestCase):
               push_dispatch: {str(push_dispatch).lower()}
               branch: {branch or 'null'}
               version_base: {version_base or 'null'}
+            build_depends:
+              projects: [{", ".join(build_depends)}]
             """))
         (d / "maintainers.yaml").write_text(f"maintainers:\n  - name: Maint\n    gpg: [{self.maint}]\n")
         (d / "keys" / "maint.asc").write_text(self.maint_key)
@@ -152,6 +155,13 @@ class ContinuousHeadsTest(unittest.TestCase):
         self.assertEqual([b["project"] for b in self.heads()[0]], ["polled", "pushed"])
         self.assertEqual([b["project"] for b in self.heads("--polled-only")[0]], ["polled"])
         self.assertEqual([b["project"] for b in self.heads("--project", "pushed")[0]], ["pushed"])
+
+    def test_dependencies_are_built_first(self):
+        # Alphabetically "app" would come first; it build-depends on "lib"
+        self.project("app", self.upstream("app", signed=True), build_depends=["lib"])
+        self.project("lib", self.upstream("lib", signed=True))
+        self.commit_build()
+        self.assertEqual([b["project"] for b in self.heads()[0]], ["lib", "app"])
 
     def test_requested_project_must_be_enabled(self):
         self.project("off", self.upstream("off", signed=True), enabled=False)
