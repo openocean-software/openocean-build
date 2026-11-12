@@ -11,8 +11,8 @@ branch head, plus submodules at the commits it records (upstream.submodules).
 
   - OSV (api.osv.dev) is asked about each commit, and about the tag as a version
     of the upstream repository (OSV's GIT ecosystem).
-  - NVD (services.nvd.nist.gov) is asked about the release's version of the
-    project's security.cpe, for CVEs that OSV can't tie to a commit. Set
+  - NVD (services.nvd.nist.gov) is asked about the release's version of each
+    of the project's security.cpes, for CVEs that OSV can't tie to a commit. Set
     $NVD_API_KEY to raise NVD's rate limit.
   - Scorecard results come from api.securityscorecards.dev when the repository
     is in its weekly dataset, otherwise from running --scorecard-bin (which reads
@@ -34,6 +34,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -121,7 +122,8 @@ def sources(project, config, version=None, resolve=remote_commit, list_submodule
         version = version or project_config.upstream_version(project)
         tag = project_config.release_tag(config, version)
         commit = config["release"].get("commit") or resolve(url, f"refs/tags/{tag}")
-        # A version NVD would know: the tag's, without our repack suffix
+        # A version NVD would know: the tag's, without our repack suffix. A
+        # snapshot has none: it may already carry fixes for its base release.
         cpe_version = project_config.tag_version(config, tag) if tag else None
         found = [{"name": project, "url": url, "ref": tag, "commit": commit, "cpe_version": cpe_version}]
     else:
@@ -155,22 +157,39 @@ def osv_vulnerabilities(source, request=http):
     return found
 
 
-def nvd_vulnerabilities(source, cpe, request=http, api_key=None):
-    """[{id, aliases, summary, severity, url}] that NVD lists for cpe at the source's version."""
+def nvd_vulnerabilities(source, cpe, request=http, api_key=None, pause=None):
+    """[{id, aliases, summary, severity, url}] that NVD lists for cpe at the source's version.
+
+    NVD's version ranges are sometimes narrower than its own descriptions (a
+    record "through 24.8.1" whose range ends before 24.8.1), so a CVE of the
+    product whose description names the exact version counts too.
+    """
     if not cpe or not source["cpe_version"]:
         return []
-    match = f"{cpe}:{source['cpe_version'].replace('~', '_')}"
+    version = source["cpe_version"].replace("~", "_")
     headers = {"apiKey": api_key} if api_key else None
-    _, result = request("GET", f"{NVD_API}?{urllib.parse.urlencode({'virtualMatchString': match})}", headers=headers)
+
+    def query(match):
+        if pause:
+            pause()
+        _, result = request("GET", f"{NVD_API}?{urllib.parse.urlencode({'virtualMatchString': match})}", headers=headers)
+        return [item["cve"] for item in result.get("vulnerabilities", [])]
+
+    def summary(cve):
+        return next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "")
+
+    matched = {cve["id"]: cve for cve in query(f"{cpe}:{version}")}
+    named = re.compile(rf"(?<![\w.]){re.escape(version)}(?![\w]|\.\d)")
+    for cve in query(cpe):
+        if cve["id"] not in matched and named.search(summary(cve)):
+            matched[cve["id"]] = cve
     found = []
-    for item in result.get("vulnerabilities", []):
-        cve = item["cve"]
-        summary = next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "")
+    for cve_id, cve in sorted(matched.items()):
         metrics = [m for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30")
                    for m in cve.get("metrics", {}).get(key, [])]
         severity = metrics[0]["cvssData"].get("vectorString", "") if metrics else ""
-        found.append({"id": cve["id"], "aliases": [], "summary": summary[:300], "severity": severity,
-                      "url": f"https://nvd.nist.gov/vuln/detail/{cve['id']}"})
+        found.append({"id": cve_id, "aliases": [], "summary": summary(cve)[:300], "severity": severity,
+                      "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}"})
     return found
 
 
@@ -206,15 +225,19 @@ def scorecard(source, scorecard_bin=None, request=http, run=subprocess.run):
             "checks": {c["name"]: c["score"] for c in result.get("checks", [])}}
 
 
-def scan(projects, scorecard_bin=None, request=http, run=subprocess.run, nvd_api_key=None, **source_args):
+def scan(projects, scorecard_bin=None, request=http, run=subprocess.run, nvd_api_key=None, pause=time.sleep,
+         **source_args):
     results = []
+
+    def nvd(source, cpe):
+        # Without a key NVD allows 5 requests in 30 seconds
+        return nvd_vulnerabilities(source, cpe, request, nvd_api_key, None if nvd_api_key else lambda: pause(6))
     for project in projects:
         config = project_config.load(project)
-        cpe = config["security"].get("cpe")
+        cpes = config["security"]["cpes"]
         for source in sources(project, config, **source_args):
-            vulnerabilities = merge_vulnerabilities(
-                osv_vulnerabilities(source, request),
-                nvd_vulnerabilities(source, cpe if source["name"] == project else None, request, nvd_api_key))
+            from_nvd = [nvd(source, cpe) for cpe in cpes if source["name"] == project and source["cpe_version"]]
+            vulnerabilities = merge_vulnerabilities(osv_vulnerabilities(source, request), *from_nvd)
             results.append({**source, "project": project, "vulnerabilities": vulnerabilities,
                             "scorecard": scorecard(source, scorecard_bin, request, run)})
     return results

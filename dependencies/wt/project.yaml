@@ -4,6 +4,10 @@ upstream:
   git: https://github.com/emweb/wt.git
   tag_format: "{version}"
 source: git
+
+# Wt's CVEs are filed under both vendor names
+security:
+  cpes: ["cpe:2.3:a:emweb:wt", "cpe:2.3:a:webtoolkit:wt"]
 release:
   commit: 43a1b94e827196ae47a0bdc3ecd3c19f0a89c919
 

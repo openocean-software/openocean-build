@@ -35,7 +35,8 @@ def config(**override):
 
 
 class FakeApi:
-    """Answers (method, url) with canned (status, body); records every request."""
+    """Answers (method, url) with canned (status, body), by exact URL or else by URL prefix;
+    records every request."""
 
     def __init__(self, responses):
         self.responses = responses
@@ -43,6 +44,9 @@ class FakeApi:
 
     def __call__(self, method, url, body=None, token=None, headers=None):
         self.requests.append((method, url, body))
+        if (method, url) in self.responses:
+            response = self.responses[(method, url)]
+            return response(body) if callable(response) else response
         for (m, prefix), response in self.responses.items():
             if m == method and url.startswith(prefix):
                 return response(body) if callable(response) else response
@@ -148,15 +152,39 @@ class VulnerabilitiesTest(unittest.TestCase):
         self.assertEqual(scan.osv_vulnerabilities({**SOURCE, "ref": ""}, api), [])
         self.assertEqual(api.requests[0][2], {"queries": [{"commit": SHA_TAG}]})
 
+    def nvd(self, match):
+        return f"{scan.NVD_API}?{urllib.parse.urlencode({'virtualMatchString': match})}"
+
+    @staticmethod
+    def cve(cve_id, text, metrics=None):
+        return {"cve": {"id": cve_id, "descriptions": [{"lang": "es", "value": "otro"}, {"lang": "en", "value": text}],
+                        "metrics": metrics or {}}}
+
     def test_nvd_is_asked_about_the_cpe_at_the_release_version(self):
-        api = FakeApi({("GET", scan.NVD_API): (200, {"vulnerabilities": [{"cve": {
-            "id": "CVE-2026-1", "descriptions": [{"lang": "es", "value": "malo"}, {"lang": "en", "value": "bad"}],
-            "metrics": {"cvssMetricV31": [{"cvssData": {"vectorString": "CVSS:3.1/AV:N"}}]}}}]})})
-        found = scan.nvd_vulnerabilities({**SOURCE, "cpe_version": "1.2.0~rc1"}, "cpe:2.3:a:o:p", api)
-        query = urllib.parse.parse_qs(urllib.parse.urlparse(api.requests[0][1]).query)
-        self.assertEqual(query, {"virtualMatchString": ["cpe:2.3:a:o:p:1.2.0_rc1"]})
+        api = FakeApi({
+            ("GET", self.nvd("cpe:2.3:a:o:p:1.2.0_rc1")): (200, {"vulnerabilities": [self.cve(
+                "CVE-2026-1", "bad", {"cvssMetricV31": [{"cvssData": {"vectorString": "CVSS:3.1/AV:N"}}]})]}),
+            ("GET", self.nvd("cpe:2.3:a:o:p")): (200, {"vulnerabilities": []}),
+        })
+        pauses = []
+        found = scan.nvd_vulnerabilities({**SOURCE, "cpe_version": "1.2.0~rc1"}, "cpe:2.3:a:o:p", api,
+                                         pause=lambda: pauses.append(1))
         self.assertEqual(found, [{"id": "CVE-2026-1", "aliases": [], "summary": "bad", "severity": "CVSS:3.1/AV:N",
                                   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-1"}])
+        self.assertEqual(len(pauses), 2)
+
+    def test_a_cve_whose_description_names_the_version_counts_despite_its_range(self):
+        # As NVD records MOOS-IvP's 2026 CVEs: "through 24.8.1" in words, versionEndExcluding 24.8.1 in the range
+        api = FakeApi({
+            ("GET", self.nvd("cpe:2.3:a:o:p:24.8.1")): (200, {"vulnerabilities": []}),
+            ("GET", self.nvd("cpe:2.3:a:o:p")): (200, {"vulnerabilities": [
+                self.cve("CVE-2026-1", "p through 24.8.1 contains an overflow."),
+                self.cve("CVE-2026-2", "p before 24.8.10 contains an overflow."),
+                self.cve("CVE-2026-3", "p 124.8.1 and 24.8.1.2 are affected."),
+            ]}),
+        })
+        found = scan.nvd_vulnerabilities({**SOURCE, "cpe_version": "24.8.1"}, "cpe:2.3:a:o:p", api)
+        self.assertEqual([v["id"] for v in found], ["CVE-2026-1"])
 
     def test_nvd_is_skipped_without_a_cpe_or_a_version(self):
         api = FakeApi({})
@@ -168,6 +196,32 @@ class VulnerabilitiesTest(unittest.TestCase):
         osv = [{"id": "GHSA-1", "aliases": ["CVE-2026-1"]}]
         nvd = [{"id": "CVE-2026-1", "aliases": []}, {"id": "CVE-2026-2", "aliases": []}]
         self.assertEqual([v["id"] for v in scan.merge_vulnerabilities(osv, nvd)], ["GHSA-1", "CVE-2026-2"])
+
+
+class ScanTest(unittest.TestCase):
+    def test_each_cpe_is_asked_about_the_release_and_nvd_is_paced_without_a_key(self):
+        api = FakeApi({
+            ("POST", f"{scan.OSV_API}/querybatch"): (200, {"results": [{}, {}]}),
+            ("GET", f"{scan.NVD_API}?virtualMatchString=cpe%3A2.3%3Aa%3Aone%3Ap%3A1.0"): (200, {"vulnerabilities": [
+                {"cve": {"id": "CVE-2026-1", "descriptions": []}}]}),
+            ("GET", f"{scan.NVD_API}?virtualMatchString=cpe%3A2.3%3Aa%3Atwo%3Ap%3A1.0"): (200, {"vulnerabilities": [
+                {"cve": {"id": "CVE-2026-1", "descriptions": []}}, {"cve": {"id": "CVE-2026-2", "descriptions": []}}]}),
+            ("GET", f"{scan.NVD_API}?virtualMatchString=cpe%3A2.3%3Aa%3Aone%3Ap"): (200, {"vulnerabilities": []}),
+            ("GET", f"{scan.NVD_API}?virtualMatchString=cpe%3A2.3%3Aa%3Atwo%3Ap"): (200, {"vulnerabilities": []}),
+            ("GET", scan.SCORECARD_API): (404, None),
+        })
+        c = config(upstream={"git": "https://github.com/o/p.git"}, source="git",
+                   security={"cpes": ["cpe:2.3:a:one:p", "cpe:2.3:a:two:p"]})
+        pauses = []
+        original = scan.project_config.load
+        scan.project_config.load = lambda project: c
+        try:
+            results = scan.scan(["p"], request=api, pause=pauses.append, version="1.0",
+                                resolve=resolve({("https://github.com/o/p.git", "refs/tags/v1.0"): SHA_TAG}))
+        finally:
+            scan.project_config.load = original
+        self.assertEqual([v["id"] for v in results[0]["vulnerabilities"]], ["CVE-2026-1", "CVE-2026-2"])
+        self.assertEqual(pauses, [6, 6, 6, 6])
 
 
 class ScorecardTest(unittest.TestCase):
@@ -260,6 +314,12 @@ class IssuesTest(unittest.TestCase):
 
 
 class RealProjectsTest(unittest.TestCase):
+    def test_every_cpe_names_an_application(self):
+        for name in scan.project_config.list_projects():
+            for cpe in scan.project_config.load(name)["security"]["cpes"]:
+                with self.subTest(project=name, cpe=cpe):
+                    self.assertRegex(cpe, r"^cpe:2\.3:a:[^:]+:[^:]+$")
+
     def test_every_project_has_a_github_upstream_to_scan(self):
         for name in scan.project_config.list_projects():
             with self.subTest(project=name):

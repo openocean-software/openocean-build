@@ -107,9 +107,9 @@ continuous:
 
 # What ci/security-scan checks besides OSV and Scorecard (see docs/security.md).
 security:
-  # The NVD CPE (cpe:2.3:a:<vendor>:<product>) whose CVEs apply to this
-  # project's upstream, asked about at the release's version; null for none
-  cpe: null
+  # NVD CPEs (cpe:2.3:a:<vendor>:<product>) whose CVEs apply to this project's
+  # upstream, asked about at the release's version
+  cpes: []
 
 # Where every newly built package is installed before publishing.
 install_test:
