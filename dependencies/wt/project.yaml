@@ -16,7 +16,7 @@ install_test:
       printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(hello CXX)' 'find_package(wt CONFIG REQUIRED)' \
         'add_executable(hello hello.cpp)' 'target_link_libraries(hello Wt::Wt Wt::HTTP)' > /tmp/hello/CMakeLists.txt
     - |
-      printf '%s\n' '#include <Wt/WApplication.h>' '#include <Wt/WText.h>' \
+      printf '%s\n' '#include <Wt/WApplication.h>' '#include <Wt/WContainerWidget.h>' '#include <Wt/WText.h>' \
         'int main(int argc, char **argv) {' \
         '  return Wt::WRun(argc, argv, [](const Wt::WEnvironment &env) {' \
         '    auto app = std::make_unique<Wt::WApplication>(env);' \
@@ -26,5 +26,7 @@ install_test:
     - cmake -S /tmp/hello -B /tmp/hello/build
     - cmake --build /tmp/hello/build
     - (/tmp/hello/build/hello --docroot /usr/share/Wt --http-listen 127.0.0.1:8080 > /tmp/hello/log 2>&1 &)
-    - for i in $(seq 1 20); do curl -sf http://127.0.0.1:8080/ > /tmp/hello/page && break; sleep 1; done
+    # Wt answers a browser with a JavaScript bootstrap page, and a crawler with the rendered page
+    - for i in $(seq 1 20); do curl -sf -A Googlebot http://127.0.0.1:8080/ > /tmp/hello/page && break; sleep 1; done
     - grep -F '<title>openocean hello</title>' /tmp/hello/page
+    - grep -F 'hello from Wt' /tmp/hello/page
