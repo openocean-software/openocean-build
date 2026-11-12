@@ -1,0 +1,22 @@
+Source: mavlink
+Section: libdevel
+Priority: optional
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               python3
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://mavlink.io/
+Vcs-Browser: https://github.com/mavlink/mavlink
+
+Package: libmavlink-dev
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: MAVLink message headers for C and C++11
+ MAVLink is a lightweight messaging protocol for communicating with drones
+ and between onboard drone components.
+ .
+ This package contains the MAVLink 2 headers generated for every dialect, in
+ C and C++11, and a CMake package (find_package(MAVLink), MAVLink::mavlink).

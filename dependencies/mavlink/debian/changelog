@@ -1,0 +1,9 @@
+mavlink (2.0.0+git20260507.4b03484-0oos1) trixie; urgency=medium
+
+  * Package MAVLink for openocean-build, from upstream commit 4b03484e
+    (mavlink/mavlink master, 7 May 2026), the commit GobySoft/mavlink's
+    2.0.0+20260507 tag points at, and the packaging in GobySoft/mavlink-debian.
+  * Install the CMake package under /usr/lib/cmake, since the headers are
+    the same on every architecture.
+
+ -- Toby Schneider <toby@gobysoft.org>  Thu, 12 Nov 2026 12:00:00 +1100

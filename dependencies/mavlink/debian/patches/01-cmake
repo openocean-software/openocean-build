@@ -1,0 +1,86 @@
+Description: Generate the C and C++11 headers for MAVLink 2 without pip
+ Upstream's CMakeLists.txt pip-installs pymavlink's requirements, which a
+ package build can't (and doesn't need: the generator runs from the pymavlink
+ submodule). Also generates the C++11 headers next to the C ones, under
+ mavlink/v2.0/, and installs them.
+Author: Toby Schneider <toby@gobysoft.org>
+Forwarded: not-needed
+Index: mavlink-2.0.0+20260507/CMakeLists.txt
+===================================================================
+--- mavlink-2.0.0+20260507.orig/CMakeLists.txt
++++ mavlink-2.0.0+20260507/CMakeLists.txt
+@@ -4,17 +4,6 @@ project(mavlink)
+
+ find_package(Python COMPONENTS Interpreter REQUIRED)
+
+-# We automatically install the pip dependencies locally below.
+-# Therefore, we check whether pip is available here.
+-execute_process(
+-    COMMAND ${Python_EXECUTABLE} -m pip -V
+-    RESULT_VARIABLE EXIT_CODE
+-    OUTPUT_QUIET
+-)
+-if (NOT ${EXIT_CODE} EQUAL 0)
+-    message(FATAL_ERROR "Python pip not found, pip is required")
+-endif()
+-
+ if (NOT MAVLINK_DIALECT)
+     set(MAVLINK_DIALECT common)
+ endif()
+@@ -26,20 +15,33 @@ endif()
+ message(STATUS "MAVLink version: ${MAVLINK_VERSION}")
+
+ set(EXAMPLE_HEADER ${CMAKE_CURRENT_BINARY_DIR}/include/mavlink/${MAVLINK_DIALECT}/mavlink.h)
++set(EXAMPLE_HEADER_CXX ${CMAKE_CURRENT_BINARY_DIR}/include/mavlink/${MAVLINK_DIALECT}/mavlink.hpp)
+
+ add_custom_command(OUTPUT ${EXAMPLE_HEADER}
+     COMMAND ${Python_EXECUTABLE}
+-        -m pip install -r pymavlink/requirements.txt --upgrade -t ${CMAKE_CURRENT_BINARY_DIR}/pip-dependencies/
+-        COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/pip-dependencies/" ${Python_EXECUTABLE}
+         -m pymavlink.tools.mavgen
+         --lang=C
++        --no-validate
+         --wire-protocol=${MAVLINK_VERSION}
+-        --output ${CMAKE_CURRENT_BINARY_DIR}/include/mavlink/
++        --output ${CMAKE_CURRENT_BINARY_DIR}/include/mavlink/v${MAVLINK_VERSION}/
+         message_definitions/v1.0/${MAVLINK_DIALECT}.xml
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+     DEPENDS message_definitions/v1.0/${MAVLINK_DIALECT}.xml
+     COMMENT "Generating C headers")
+
++add_custom_command(OUTPUT ${EXAMPLE_HEADER_CXX}
++    COMMAND ${Python_EXECUTABLE}
++        -m pymavlink.tools.mavgen
++        --lang=C++11
++        --no-validate
++        --wire-protocol=${MAVLINK_VERSION}
++        --output ${CMAKE_CURRENT_BINARY_DIR}/include/mavlink/v${MAVLINK_VERSION}/
++        message_definitions/v1.0/${MAVLINK_DIALECT}.xml
++        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
++    DEPENDS message_definitions/v1.0/${MAVLINK_DIALECT}.xml
++    COMMENT "Generating C++ headers")
++
++
+ # Unfortunately, the dependencies don't work for INTERFACE libraries.
+ # The only way I could make it work is to add ALL which means it
+ # will do the file generation every time even when nothing has changed.
+@@ -47,6 +49,10 @@ add_custom_target(generate_c_headers
+     ALL
+     DEPENDS ${EXAMPLE_HEADER})
+
++add_custom_target(generate_cxx_headers
++    ALL
++    DEPENDS ${EXAMPLE_HEADER_CXX})
++
+ add_library(mavlink INTERFACE)
+
+ add_dependencies(mavlink generate_c_headers)
+@@ -65,7 +71,7 @@ install(TARGETS mavlink
+
+ install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/mavlink"
+     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+-    FILES_MATCHING PATTERN "*.h"
++    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+ )
+
+ install(EXPORT MAVLinkTargets
