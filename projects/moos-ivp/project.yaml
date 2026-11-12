@@ -4,6 +4,9 @@ upstream:
 # Upstream release tarballs via debian/watch, repacked to drop the bundled proj.
 source: uscan
 
+security:
+  cpes: ["cpe:2.3:a:mit:moos-ivp"]
+
 install_test:
   commands:
     - command -v MOOSDB

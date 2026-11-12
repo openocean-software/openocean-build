@@ -1,0 +1,72 @@
+# Scans the upstream source each project releases (ci/security-scan): known
+# vulnerabilities from OSV and NVD, and the upstream repository's OpenSSF
+# Scorecard. Weekly and by hand, it keeps the "Security scan report" issue up
+# to date and opens an issue for each new advisory. A pull request that
+# changes what is scanned gets the report in its run summary only.
+name: Security scan
+
+on:
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ci/security-scan
+      - .github/workflows/security.yml
+      - defaults.yaml
+      - projects/*/project.yaml
+      - projects/*/debian/changelog
+      - dependencies/*/project.yaml
+      - dependencies/*/debian/changelog
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan upstream sources
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      SCORECARD_VERSION: 5.6.0
+      SCORECARD_SHA256: 19bde07129450cb65a95c6e3b9f34e034341579e6f0e241546ec3ae6efb2dd9a
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install tools
+        run: |
+          if ! python3 -c 'import yaml' 2>/dev/null || ! command -v dpkg-parsechangelog > /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-yaml dpkg-dev
+          fi
+
+      # For repositories not in Scorecard's weekly dataset
+      - name: Install Scorecard
+        run: |
+          set -euo pipefail
+          tarball="scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${RUNNER_TEMP}/${tarball}" "https://github.com/ossf/scorecard/releases/download/v${SCORECARD_VERSION}/${tarball}"
+          echo "${SCORECARD_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum -c
+          mkdir -p "${RUNNER_TEMP}/scorecard"
+          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}/scorecard"
+
+      - name: Scan
+        env:
+          EVENT: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_AUTH_TOKEN: ${{ github.token }}
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          set -euo pipefail
+          args=(--scorecard-bin "${RUNNER_TEMP}/scorecard/scorecard" --json "${RUNNER_TEMP}/security-scan.json")
+          [ "${EVENT}" = pull_request ] || args+=(--issues "${REPOSITORY}")
+          ci/security-scan "${args[@]}"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-scan
+          path: ${{ runner.temp }}/security-scan.json

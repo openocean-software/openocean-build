@@ -12,6 +12,7 @@ nav:
   - CI: ci.md
   - Signing and trust: trust.md
   - Keys: keys.md
+  - Security scanning: security.md
   - Continuous builds: continuous.md
   - Projects: projects.md
   - Dependency projects: dependencies.md

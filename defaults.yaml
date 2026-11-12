@@ -105,6 +105,12 @@ continuous:
   # the head (a fork without tags, or a branch upstream tags elsewhere)
   version_base: null
 
+# What ci/security-scan checks besides OSV and Scorecard (see docs/security.md).
+security:
+  # NVD CPEs (cpe:2.3:a:<vendor>:<product>) whose CVEs apply to this project's
+  # upstream, asked about at the release's version
+  cpes: []
+
 # Where every newly built package is installed before publishing.
 install_test:
   target: { distro: ubuntu, dist: resolute, arch: amd64 }
