@@ -1,0 +1,3 @@
+usr/lib/*/libwt*.so.*
+usr/share/Wt
+etc/wt/wt_config.xml

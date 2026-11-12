@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# Wt has its own install-directory variables. The examples and tests aren't
+# packaged, and the tests aren't registered with CTest, so building them only
+# costs time.
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DLIB_INSTALL_DIR=lib/$(DEB_HOST_MULTIARCH) \
+		-DCMAKE_INSTALL_DIR=lib/$(DEB_HOST_MULTIARCH)/cmake \
+		-DBUILD_EXAMPLES=OFF \
+		-DBUILD_TESTS=OFF

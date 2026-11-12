@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+
+# Upstream's autotools files are stale; it builds with CMake
+%:
+	dh $@ --buildsystem=cmake --without autoreconf
+
+# Upstream asks for CMake 2.8, which CMake 4 refuses without this
+override_dh_auto_configure:
+	dh_auto_configure -- -DBUILD_SHARED_LIBS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5

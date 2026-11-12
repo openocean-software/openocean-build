@@ -1,0 +1,32 @@
+Source: libais
+Section: libs
+Priority: optional
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/schwehr/libais
+Vcs-Browser: https://github.com/schwehr/libais
+
+Package: libais1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: decoder for maritime AIS messages
+ libais decodes the messages of the maritime Automatic Identification
+ System (AIS), from NMEA sentences or their payloads.
+ .
+ This package contains the shared library.
+
+Package: libais-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libais1 (= ${binary:Version}), ${misc:Depends}
+Description: decoder for maritime AIS messages (development files)
+ libais decodes the messages of the maritime Automatic Identification
+ System (AIS), from NMEA sentences or their payloads.
+ .
+ This package contains the headers (ais.h, vdm.h) and the library to link
+ against.

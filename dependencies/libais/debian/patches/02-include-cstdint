@@ -1,0 +1,25 @@
+Description: Include <cstdint> where uint8_t is used
+ GCC 13 and later no longer include it through other standard headers.
+Author: Toby Schneider <toby@gobysoft.org>
+Forwarded: no
+---
+--- a/src/libais/vdm.h
++++ b/src/libais/vdm.h
+@@ -63,6 +63,7 @@
+ #ifndef LIBAIS_VDM_H_
+ #define LIBAIS_VDM_H_
+ 
++#include <cstdint>
+ #include <deque>
+ #include <memory>
+ #include <string>
+--- a/src/libais/vdm.cpp
++++ b/src/libais/vdm.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include <algorithm>
+ #include <cctype>
++#include <cstdint>
+ #include <deque>
+ #include <functional>
+ #include <iomanip>

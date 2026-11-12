@@ -1,0 +1,8 @@
+libais (0.17+git20180117.4e9b6d6-0oos1) trixie; urgency=medium
+
+  * Package libais for openocean-build, from upstream commit 4e9b6d6e
+    ("version 0.17", schwehr/libais master, which has no 0.17 tag) and the
+    packaging in GobySoft/debian-libais. Upstream has no release since
+    (schwehr/libais#253).
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 10:00:00 +1100

@@ -1,0 +1,62 @@
+Source: wt
+Section: libdevel
+Priority: optional
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake (>= 3.13.0),
+               default-libmysqlclient-dev,
+               libboost-dev (>= 1.66.0),
+               libboost-filesystem-dev (>= 1.66.0),
+               libboost-program-options-dev (>= 1.66.0),
+               libboost-system-dev (>= 1.66.0),
+               libboost-thread-dev (>= 1.66.0),
+               libgraphicsmagick1-dev,
+               libhpdf-dev (<< 2.4.0),
+               libpango1.0-dev,
+               libssl-dev
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://www.webtoolkit.eu/wt/
+Vcs-Browser: https://github.com/emweb/wt
+
+Package: libwt4.15.0
+Architecture: any
+Multi-Arch: same
+Conflicts: libwt50, libwt-common
+# Earlier versions from packages.gobysoft.org ship the same /usr/share/Wt and /etc/wt
+Breaks: libwt4.11.3, libwt4.13.2
+Replaces: libwt4.11.3, libwt4.13.2
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: C++ library and application server for web applications [libraries]
+ Wt is a web GUI library in modern C++. Quickly develop highly interactive
+ web UIs with widgets, without having to write a single line of JavaScript.
+ Wt handles all request handling and page rendering for you, so you can
+ focus on functionality.
+ .
+ This package contains the libraries: Wt, its HTTP and test connectors, and
+ Wt::Dbo with its SQLite and MySQL backends.
+
+Package: libwt4-dev
+Architecture: any
+Multi-Arch: same
+Conflicts: libwt-dev
+Depends: cmake (>= 3.13.0),
+         default-libmysqlclient-dev,
+         libboost-dev (>= 1.66.0),
+         libboost-filesystem-dev (>= 1.66.0),
+         libboost-program-options-dev (>= 1.66.0),
+         libboost-system-dev (>= 1.66.0),
+         libboost-thread-dev (>= 1.66.0),
+         libgraphicsmagick1-dev,
+         libhpdf-dev (<< 2.4.0),
+         libpango1.0-dev,
+         libssl-dev,
+         libwt4.15.0 (= ${binary:Version}),
+         ${misc:Depends}
+Description: C++ library and application server for web applications [development]
+ Wt is a web GUI library in modern C++. Quickly develop highly interactive
+ web UIs with widgets, without having to write a single line of JavaScript.
+ Wt handles all request handling and page rendering for you, so you can
+ focus on functionality.
+ .
+ This package contains the headers and the CMake package (find_package(wt)).
