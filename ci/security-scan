@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+"""Scans the upstream source each project releases: known vulnerabilities from
+OSV, and the upstream repository's OpenSSF Scorecard.
+
+Usage:
+  security-scan [--project NAME]... [--scorecard-bin PATH] [--json FILE] [--issues OWNER/REPO]
+
+For each project (or each NAME), the source is what a build would take: the
+release tag (and release.commit, if pinned), or for a snapshot-only project its
+branch head, plus submodules at the commits it records (upstream.submodules).
+
+  - OSV (api.osv.dev) is asked about each commit, and about the tag as a version
+    of the upstream repository (OSV's GIT ecosystem).
+  - NVD (services.nvd.nist.gov) is asked about the release's version of the
+    project's security.cpe, for CVEs that OSV can't tie to a commit. Set
+    $NVD_API_KEY to raise NVD's rate limit.
+  - Scorecard results come from api.securityscorecards.dev when the repository
+    is in its weekly dataset, otherwise from running --scorecard-bin (which reads
+    GitHub with $GITHUB_TOKEN).
+
+Prints a Markdown report (also appended to $GITHUB_STEP_SUMMARY when set).
+--json writes the results. --issues keeps the repository's "Security scan
+report" issue up to date and opens an issue for each advisory not yet reported
+(with $GITHUB_TOKEN). Exits 0 whatever it finds: a finding is for a person to
+weigh, not a build failure.
+"""
+
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+_loader = importlib.machinery.SourceFileLoader("project_config", str(ROOT / "ci" / "project-config"))
+_spec = importlib.util.spec_from_loader("project_config", _loader)
+project_config = importlib.util.module_from_spec(_spec)
+_loader.exec_module(project_config)
+
+OSV_API = "https://api.osv.dev/v1"
+NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+SCORECARD_API = "https://api.securityscorecards.dev/projects"
+GITHUB_API = "https://api.github.com"
+REPORT_TITLE = "Security scan report"
+
+
+def http(method, url, body=None, token=None, headers=None):
+    """(status, parsed JSON or None). 404 is a result, not an error."""
+    headers = {"Accept": "application/json", "User-Agent": "openocean-build-security-scan", **(headers or {})}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            text = response.read().decode()
+            return response.status, json.loads(text) if text else None
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return 404, None
+        raise
+
+
+def git(*args, cwd=None):
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def github_slug(url):
+    match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+?)(\.git)?/?", url)
+    return match[1] if match else None
+
+
+def remote_commit(url, ref):
+    """The commit a tag or branch names (a tag's target, if annotated)."""
+    out = git("ls-remote", url, ref, f"{ref}^{{}}")
+    commits = dict(reversed(line.split("\t")) for line in out.splitlines())
+    sha = commits.get(f"{ref}^{{}}") or commits.get(ref)
+    if not sha:
+        raise RuntimeError(f"{url} has no {ref}")
+    return sha
+
+
+def submodules(url, commit):
+    """[(path, url, commit)] that the source at commit records."""
+    with tempfile.TemporaryDirectory() as tmp:
+        git("init", "-q", tmp)
+        git("fetch", "-q", "--depth", "1", url, commit, cwd=tmp)
+        try:
+            config = git("config", "--blob", "FETCH_HEAD:.gitmodules", "--get-regexp", r"^submodule\..*\.(path|url)$", cwd=tmp)
+        except subprocess.CalledProcessError:
+            return []
+        paths, urls = {}, {}
+        for line in config.splitlines():
+            key, value = line.split(" ", 1)
+            name, field = key[len("submodule."):].rsplit(".", 1)
+            (paths if field == "path" else urls)[name] = value
+        found = []
+        for name, path in sorted(paths.items()):
+            entry = git("ls-tree", "FETCH_HEAD", path, cwd=tmp)
+            if entry.startswith("160000 commit "):
+                found.append((path, urls[name], entry.split()[2]))
+        return found
+
+
+def sources(project, config, version=None, resolve=remote_commit, list_submodules=submodules):
+    """The upstream source a build of project takes, as [{name, url, ref, commit}]."""
+    url = config["upstream"]["git"]
+    if config["release"].get("enabled", True):
+        version = version or project_config.upstream_version(project)
+        tag = project_config.release_tag(config, version)
+        commit = config["release"].get("commit") or resolve(url, f"refs/tags/{tag}")
+        # A version NVD would know: the tag's, without our repack suffix
+        cpe_version = project_config.tag_version(config, tag) if tag else None
+        found = [{"name": project, "url": url, "ref": tag, "commit": commit, "cpe_version": cpe_version}]
+    else:
+        branch = config["continuous"].get("branch")
+        ref = f"refs/heads/{branch}" if branch else "HEAD"
+        found = [{"name": project, "url": url, "ref": "", "commit": resolve(url, ref), "cpe_version": None}]
+    if config["upstream"].get("submodules"):
+        for path, sub_url, commit in list_submodules(url, found[0]["commit"]):
+            found.append({"name": f"{project}/{path}", "url": sub_url, "ref": "", "commit": commit, "cpe_version": None})
+    return found
+
+
+def osv_vulnerabilities(source, request=http):
+    """[{id, aliases, summary, severity, url}] that OSV knows affect the source."""
+    queries = [{"commit": source["commit"]}]
+    if source["ref"]:
+        repo = source["url"].removesuffix(".git")
+        queries.append({"package": {"ecosystem": "GIT", "name": repo}, "version": source["ref"]})
+    _, batch = request("POST", f"{OSV_API}/querybatch", {"queries": queries})
+    ids = sorted({v["id"] for result in batch["results"] for v in result.get("vulns", [])})
+    found, seen = [], set()
+    for vuln_id in ids:
+        if vuln_id in seen:
+            continue
+        _, vuln = request("GET", f"{OSV_API}/vulns/{urllib.parse.quote(vuln_id)}")
+        aliases = sorted(vuln.get("aliases", []))
+        seen.update([vuln_id, *aliases])
+        severity = ", ".join(s.get("score", "") for s in vuln.get("severity", []))
+        found.append({"id": vuln_id, "aliases": aliases, "summary": vuln.get("summary") or vuln.get("details", "")[:120],
+                      "severity": severity, "url": f"https://osv.dev/vulnerability/{vuln_id}"})
+    return found
+
+
+def nvd_vulnerabilities(source, cpe, request=http, api_key=None):
+    """[{id, aliases, summary, severity, url}] that NVD lists for cpe at the source's version."""
+    if not cpe or not source["cpe_version"]:
+        return []
+    match = f"{cpe}:{source['cpe_version'].replace('~', '_')}"
+    headers = {"apiKey": api_key} if api_key else None
+    _, result = request("GET", f"{NVD_API}?{urllib.parse.urlencode({'virtualMatchString': match})}", headers=headers)
+    found = []
+    for item in result.get("vulnerabilities", []):
+        cve = item["cve"]
+        summary = next((d["value"] for d in cve.get("descriptions", []) if d["lang"] == "en"), "")
+        metrics = [m for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30")
+                   for m in cve.get("metrics", {}).get(key, [])]
+        severity = metrics[0]["cvssData"].get("vectorString", "") if metrics else ""
+        found.append({"id": cve["id"], "aliases": [], "summary": summary[:300], "severity": severity,
+                      "url": f"https://nvd.nist.gov/vuln/detail/{cve['id']}"})
+    return found
+
+
+def merge_vulnerabilities(*lists):
+    """One entry per advisory: OSV's records carry the CVE as an alias."""
+    merged, seen = [], set()
+    for vuln in (v for found in lists for v in found):
+        names = {vuln["id"], *vuln["aliases"]}
+        if names & seen:
+            continue
+        seen |= names
+        merged.append(vuln)
+    return merged
+
+
+def scorecard(source, scorecard_bin=None, request=http, run=subprocess.run):
+    """{score, date, checks: {name: score}, via} for the source's repository, or None."""
+    slug = github_slug(source["url"])
+    if not slug:
+        return None
+    status, result = request("GET", f"{SCORECARD_API}/github.com/{slug}")
+    via = "api.securityscorecards.dev"
+    if status == 404:
+        if not scorecard_bin:
+            return None
+        done = run([scorecard_bin, f"--repo=github.com/{slug}", "--format=json", "--show-details=false"],
+                   capture_output=True, text=True)
+        if done.returncode != 0:
+            print(f"security-scan: scorecard failed for {slug}: {done.stderr.strip()[-300:]}", file=sys.stderr)
+            return None
+        result, via = json.loads(done.stdout), "scorecard"
+    return {"score": result["score"], "date": result.get("date", ""), "via": via,
+            "checks": {c["name"]: c["score"] for c in result.get("checks", [])}}
+
+
+def scan(projects, scorecard_bin=None, request=http, run=subprocess.run, nvd_api_key=None, **source_args):
+    results = []
+    for project in projects:
+        config = project_config.load(project)
+        cpe = config["security"].get("cpe")
+        for source in sources(project, config, **source_args):
+            vulnerabilities = merge_vulnerabilities(
+                osv_vulnerabilities(source, request),
+                nvd_vulnerabilities(source, cpe if source["name"] == project else None, request, nvd_api_key))
+            results.append({**source, "project": project, "vulnerabilities": vulnerabilities,
+                            "scorecard": scorecard(source, scorecard_bin, request, run)})
+    return results
+
+
+def report(results):
+    lines = ["| Source | Upstream at | Scorecard | Known vulnerabilities |", "|---|---|---|---|"]
+    for r in results:
+        at = f"{r['ref']} ({r['commit'][:7]})" if r["ref"] else r["commit"][:7]
+        card = r["scorecard"]
+        score = f"{card['score']:.1f} / 10" if card else "not scored"
+        vulns = ", ".join(f"[{v['id']}]({v['url']})" for v in r["vulnerabilities"]) or "none known"
+        lines.append(f"| {r['name']} | [{r['url'].removesuffix('.git')}]({r['url'].removesuffix('.git')}) {at} | {score} | {vulns} |")
+    low = [(r["name"], c, s) for r in results if r["scorecard"]
+           for c, s in sorted(r["scorecard"]["checks"].items()) if 0 <= s < 5]
+    if low:
+        lines += ["", "Scorecard checks below 5 (a reason to look closer, not a verdict):", ""]
+        lines += [f"- {name}: {check} {score}" for name, check, score in low]
+    return "\n".join(lines) + "\n"
+
+
+def advisory_title(result, vuln):
+    return f"Security: {result['name']} is affected by {vuln['id']}"
+
+
+def update_issues(results, repo, body, token, request=http):
+    """Updates the report issue, and opens an issue for each advisory without one (open or closed)."""
+    titles, report_issue, page = set(), None, 1
+    while True:
+        _, issues = request("GET", f"{GITHUB_API}/repos/{repo}/issues?state=all&per_page=100&page={page}", token=token)
+        for issue in issues:
+            if "pull_request" in issue:
+                continue
+            titles.add(issue["title"])
+            if issue["title"] == REPORT_TITLE and issue["state"] == "open":
+                report_issue = issue["number"]
+        if len(issues) < 100:
+            break
+        page += 1
+    report_body = (f"Updated by `security.yml` each week; see "
+                   f"[Security scanning](https://github.com/{repo}/blob/main/docs/security.md).\n\n{body}")
+    if report_issue:
+        request("PATCH", f"{GITHUB_API}/repos/{repo}/issues/{report_issue}", {"body": report_body}, token=token)
+    else:
+        request("POST", f"{GITHUB_API}/repos/{repo}/issues", {"title": REPORT_TITLE, "body": report_body}, token=token)
+    opened = []
+    for r in results:
+        for vuln in r["vulnerabilities"]:
+            title = advisory_title(r, vuln)
+            if title in titles:
+                continue
+            aliases = f" ({', '.join(vuln['aliases'])})" if vuln["aliases"] else ""
+            text = (f"[{vuln['id']}]({vuln['url']}){aliases} is reported for {r['name']}'s upstream source, "
+                    f"{r['url'].removesuffix('.git')} at {r['ref'] or r['commit'][:7]} ({r['commit']}).\n\n"
+                    f"> {vuln['summary']}\n\nSeverity: {vuln['severity'] or 'not given'}\n\n"
+                    "Decide whether our packages are affected; if so, update the pin or patch, then close this issue.")
+            request("POST", f"{GITHUB_API}/repos/{repo}/issues", {"title": title, "body": text}, token=token)
+            titles.add(title)
+            opened.append(title)
+    return opened
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--project", action="append", help="scan only this project (repeatable)")
+    parser.add_argument("--scorecard-bin", help="scorecard binary, for repositories not in Scorecard's dataset")
+    parser.add_argument("--json", help="write the results to this file")
+    parser.add_argument("--issues", metavar="OWNER/REPO", help="update the report issue and open advisory issues")
+    args = parser.parse_args()
+
+    results = scan(args.project or project_config.list_projects(), args.scorecard_bin,
+                   nvd_api_key=os.environ.get("NVD_API_KEY"))
+    body = report(results)
+    print(body, end="")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a") as f:
+            f.write(f"## Security scan\n\n{body}")
+    if args.json:
+        Path(args.json).write_text(json.dumps(results, indent=2) + "\n")
+    if args.issues:
+        token = os.environ.get("GITHUB_TOKEN")
+        if not token:
+            sys.exit("security-scan: --issues needs $GITHUB_TOKEN")
+        for title in update_issues(results, args.issues, body, token):
+            print(f"Opened: {title}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except project_config.ConfigError as e:
+        sys.exit(f"security-scan: {e}")
