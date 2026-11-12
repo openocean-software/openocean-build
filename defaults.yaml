@@ -22,6 +22,9 @@ channels:
     environment: release
     signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
     key: keys/release.asc
+    # Channels whose packages a build for this channel can build-depend on
+    # (build_depends.projects)
+    build_against: [release]
   # Prereleases, chosen per project by release.beta_tags. Users add it next to
   # release; a prerelease version (~) sorts below its final release.
   beta:
@@ -29,6 +32,7 @@ channels:
     environment: release
     signing_key: D7D7224D53A4F29E303FE01DEB505B68A5D063B0
     key: keys/release.asc
+    build_against: [release, beta]
   # Builds of each new head of a project's default branch (continuous.yml).
   # Published without human approval, so it has its own key and credentials.
   continuous:
@@ -38,6 +42,31 @@ channels:
     key: keys/continuous.asc
     # Newest versions kept of each source package
     keep: 5
+    build_against: [release, continuous]
+
+# Package repositories other than the distribution's and ours, which a
+# project can build-depend on (build_depends.repositories). {distro} and
+# {dist} in url and suite are the build target's.
+repositories:
+  zenoh:
+    url: https://download.eclipse.org/zenoh/debian-repo/
+    # A flat repository: one suite for every distribution, no components
+    suite: /
+    components: []
+    key: trust/zenoh.asc
+    fingerprint: 0ABC5913672BBE50921B3B9395D19EA1F7DF9E8E
+    # The repository keeps every version and moves forward: build against this one
+    pin:
+      packages: [libzenohc, libzenohc-dev, libzenohcpp-dev]
+      version: 1.10.2
+
+build_depends:
+  # Projects in projects/ whose packages this one build-depends on: builds
+  # see their channel's packages (channels.<channel>.build_against), and
+  # release.yml and continuous.yml build them first
+  projects: []
+  # Names in repositories:
+  repositories: []
 
 upstream:
   # The upstream tag for a version (Debian "~" becomes prerelease_separator, +dfsg is dropped)

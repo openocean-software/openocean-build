@@ -11,6 +11,26 @@ Packages are published per [channel](channels.md) at `https://apt.oceansoft.org/
 
 Some projects skip a release whose dependencies are too old (see each project's `project.yaml`).
 
+## With the setup script
+
+[`scripts/apt-setup`](https://github.com/openocean-software/openocean-build/blob/main/scripts/apt-setup) adds the channels, checking each key's fingerprint first:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/openocean-software/openocean-build/main/scripts/apt-setup
+```
+
+```bash
+sudo bash apt-setup                 # the release channel
+```
+
+```bash
+sudo bash apt-setup --beta --zenoh  # also the beta channel, and Eclipse Zenoh's repository
+```
+
+`--continuous` adds the continuous channel. `--zenoh` is for packages that use Zenoh, such as `goby3-zenoh`: it adds Eclipse's repository pinned to the Zenoh version our packages are built against, since `libzenohc` has no versioned SONAME to tell an incompatible version apart.
+
+The sections below do the same by hand.
+
 ## Release channel
 
 Save [`keys/release.asc`](https://github.com/openocean-software/openocean-build/blob/main/keys/release.asc) as `/usr/share/keyrings/openocean-release.asc`, then add `/etc/apt/sources.list.d/openocean.sources` (here for Debian trixie):

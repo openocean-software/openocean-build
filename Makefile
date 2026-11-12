@@ -29,6 +29,11 @@
 #                                        # debian/ directory d (e.g. from
 #                                        # ci/stage-debian; see
 #                                        # continuous.yml)
+#   make debian-sbuild CHANNEL=continuous
+#                                        # build for that channel: its
+#                                        # build_against channels supply
+#                                        # build_depends.projects (default
+#                                        # release)
 #   make clean                           # remove fetched source / build
 #                                        # products
 #   make distclean                       # clean + remove the Docker images
@@ -102,6 +107,12 @@ DEBIAN_SRC_DIR      := $(DEBIAN_BUILD_DIR)/$(OOS_PACKAGE)-$(UPSTREAM_VERSION)
 
 DEBIAN_SBUILD_OUTPUT_DIR := $(BUILD_DIR)/$(DISTRO)-$(DIST)-sbuild
 
+# The apt sources a build needs besides the distribution's (build_depends in
+# project.yaml), from "ci/project-config <project> sources". Rewritten on every
+# build, since which of our channels are published can change.
+CHANNEL       ?= release
+SOURCES_DIR   := $(BUILD_DIR)/$(DISTRO)-$(DIST)-$(ARCH)-sources
+
 .PHONY: debian debian-docker-image debian-sbuild debian-sbuild-docker-image source clean distclean
 
 # Quick local build: installs build-deps with mk-build-deps and runs
@@ -116,12 +127,15 @@ debian: debian-docker-image $(SRC_DIR)
 	rm -rf $(SRC_DIR)/debian
 	cp -a $(DEBIAN_DIR)/. $(SRC_DIR)/debian/
 	cp -a $(SRC_DIR) $(DEBIAN_SRC_DIR)
+	ci/project-config $(OOS_PACKAGE) sources $(CHANNEL) $(DISTRO) $(DIST) $(SOURCES_DIR)
 	docker run --rm -it \
 		-v $(DEBIAN_BUILD_DIR):/build \
+		-v $(SOURCES_DIR)/apt:/sources-apt:ro \
 		-w /build/$(notdir $(DEBIAN_SRC_DIR)) \
 		$(DEBIAN_DOCKER_IMAGE) \
 		bash -c '\
 			set -x; \
+			cp -r /sources-apt/. /etc/apt/; \
 			apt-get -y update; \
 			mk-build-deps -i -r -t "apt-get -y -o Debug::pkgProblemResolver=yes --no-install-recommends" debian/control && \
 			su builder -c "set -x; dpkg-buildpackage -us -uc -b"; \
@@ -152,9 +166,12 @@ debian-docker-image: $(DEBIAN_DOCKER_DIR)/Dockerfile
 # doesn't grant to a non-root process -- see docker/debian/sbuild/Dockerfile.
 debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 	mkdir -p $(DEBIAN_SBUILD_OUTPUT_DIR)
+	ci/project-config $(OOS_PACKAGE) sources $(CHANNEL) $(DISTRO) $(DIST) $(SOURCES_DIR) --mounted-at /sources
 	docker run --rm --privileged \
 		-v $(BUILD_DIR):/build \
 		-v $(DEBIAN_SBUILD_OUTPUT_DIR):/output \
+		-v $(SOURCES_DIR):/sources:ro \
+		-e SBUILD_CONFIG=/sources/sbuild.conf \
 		-w /output \
 		$(DEBIAN_SBUILD_DOCKER_IMAGE) \
 		--verbose \
