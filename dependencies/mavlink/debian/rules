@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# Headers only: the CMake package doesn't belong in a multiarch directory
+override_dh_auto_configure:
+	dh_auto_configure -- -DMAVLINK_DIALECT=all -DMAVLINK_VERSION=2.0 -DCMAKE_INSTALL_LIBDIR=lib

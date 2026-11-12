@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# A new push makes the running check for the same pull request moot: each run
+# checks the whole pull request, not just its latest push.
+concurrency:
+  group: check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: Lint and test ci/
@@ -73,16 +79,16 @@ jobs:
           changed=$(git diff --name-only "${BASE}...HEAD")
           # release.yml would release these on merge; a dependent's check here ran
           # against its dependency's old packages, so they go in separate pull requests
-          mapfile -t releasing < <({ grep -E '^projects/[^/]+/debian/changelog$' <<< "${changed}" || true; } | cut -d/ -f2)
+          mapfile -t releasing < <({ grep -E '^(projects|dependencies)/[^/]+/debian/changelog$' <<< "${changed}" || true; } | cut -d/ -f2)
           if [ ${#releasing[@]} -gt 1 ] && ! ci/project-config release-conflicts "${releasing[@]}" 2> /tmp/conflicts; then
             while read -r line; do echo "::error::${line}"; done < /tmp/conflicts
             exit 1
           fi
           # A change to the shared build affects every project.
-          if grep -qvE '^(projects/|README\.md$|docs/|mkdocs\.yml$)' <<< "${changed}"; then
+          if grep -qvE '^(projects/|dependencies/|README\.md$|docs/|mkdocs\.yml$|TODO\.md$)' <<< "${changed}"; then
             mapfile -t projects < <(ci/project-config list | python3 -c 'import json, sys; print(*json.load(sys.stdin), sep="\n")')
           else
-            mapfile -t projects < <({ grep '^projects/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u)
+            mapfile -t projects < <({ grep -E '^(projects|dependencies)/' <<< "${changed}" || true; } | cut -d/ -f2 | sort -u)
           fi
           # Each build is {"project", "channel", "source_ref", "version"}: the changelog version
           # for the channel it would release to, or the continuous head for a project that only

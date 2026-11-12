@@ -1,4 +1,4 @@
-# Settings shared by every project in projects/. A project's project.yaml
+# Settings shared by every project in projects/ and dependencies/. A project's project.yaml
 # overrides any of these; mappings merge key by key, lists are replaced.
 
 targets:
@@ -61,7 +61,7 @@ repositories:
       version: 1.10.2
 
 build_depends:
-  # Projects in projects/ whose packages this one build-depends on: builds
+  # Projects (in projects/ or dependencies/) whose packages this one build-depends on: builds
   # see their channel's packages (channels.<channel>.build_against), and
   # release.yml and continuous.yml build them first
   projects: []
@@ -69,9 +69,12 @@ build_depends:
   repositories: []
 
 upstream:
-  # The upstream tag for a version (Debian "~" becomes prerelease_separator, +dfsg is dropped)
+  # The upstream tag for a version (Debian "~" becomes prerelease_separator, +dfsg is dropped);
+  # null for an upstream that doesn't tag releases (needs release.commit)
   tag_format: "v{version}"
   prerelease_separator: "-"
+  # Include git submodules, at the commits the source records, in the .orig tarball
+  submodules: false
 
 release:
   # false for a project built only as continuous snapshots: a changelog
@@ -79,6 +82,11 @@ release:
   enabled: true
   # Fetch (source: git) only tags signed by one of projects/<name>/maintainers.yaml.
   require_signed_tag: false
+  # For a project in dependencies/, which nobody we list signs: the full commit hash
+  # this release is, reviewed in the pull request that sets it. The release tag must
+  # point at it; without upstream tags, the changelog version is
+  # <base>+git<YYYYMMDD>.<first 7 of the hash>, after the commit's date.
+  commit: null
   # Regular expression for upstream tags that publish to the beta channel
   # rather than release; null for none.
   beta_tags: null

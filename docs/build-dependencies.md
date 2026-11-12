@@ -6,7 +6,7 @@ A project can build-depend on packages that Debian and Ubuntu don't ship: other 
 
 ```yaml
 build_depends:
-  projects: [dccl]          # projects in projects/
+  projects: [dccl]          # projects in projects/ or dependencies/
   repositories: [zenoh]     # names in defaults.yaml's repositories
 ```
 

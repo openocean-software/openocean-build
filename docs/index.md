@@ -28,6 +28,7 @@ flowchart LR
 
 - [Installing packages](installing.md): apt sources for each channel.
 - [Channels](channels.md): release, beta and continuous, and what goes where.
+- [CI](ci.md): which workflow builds what, and when a project is skipped.
 - [Signing and trust](trust.md): which signatures a release or continuous build needs.
 - [Keys](keys.md): the keys that sign the repositories, and the keys the build trusts.
 - [Continuous builds](continuous.md): the 6-hour poll, and starting a build on each push.

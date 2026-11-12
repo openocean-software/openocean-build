@@ -1,7 +1,8 @@
-# Who and what the build trusts: a project's maintainers and their keys, the
-# channel signing keys, and the workflows that publish.
+# Who and what the build trusts: a project's maintainers and their keys, a
+# dependency's pinned source, the channel signing keys, and the workflows that publish.
 /projects/*/maintainers.yaml @tsaubergine
 /projects/*/keys/ @tsaubergine
+/dependencies/*/project.yaml @tsaubergine
 /keys/ @tsaubergine
 /trust/ @tsaubergine
 /scripts/ @tsaubergine

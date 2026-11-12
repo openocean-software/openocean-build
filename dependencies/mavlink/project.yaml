@@ -1,0 +1,38 @@
+# MAVLink's generated C and C++11 headers, for goby3. Upstream doesn't tag
+# releases (mavlink/mavlink#2115), so a release is a commit of master, pinned
+# here and versioned <base>+git<date>.<hash>.
+upstream:
+  git: https://github.com/mavlink/mavlink.git
+  tag_format: null
+  # The generator, pymavlink, is a submodule
+  submodules: true
+source: git
+release:
+  commit: 4b03484ee7b296c8f1ecd50ece4b9893baff90e8
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    - test -f /usr/include/mavlink/v2.0/common/common.hpp
+    - mkdir -p /tmp/consumer
+    # find_package(MAVLink) and both languages' headers
+    - |
+      printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(consumer C CXX)' 'find_package(MAVLink CONFIG REQUIRED)' \
+        'add_executable(c_heartbeat heartbeat.c)' 'target_link_libraries(c_heartbeat MAVLink::mavlink)' \
+        'add_executable(cxx_heartbeat heartbeat.cpp)' 'target_link_libraries(cxx_heartbeat MAVLink::mavlink)' > /tmp/consumer/CMakeLists.txt
+    - |
+      printf '%s\n' '#include <mavlink/v2.0/common/mavlink.h>' '#include <stdio.h>' 'int main(void) {' \
+        '  mavlink_message_t msg, out; mavlink_status_t status; uint8_t buf[MAVLINK_MAX_PACKET_LEN];' \
+        '  mavlink_msg_heartbeat_pack(1, 1, &msg, MAV_TYPE_SUBMARINE, MAV_AUTOPILOT_GENERIC, 0, 0, MAV_STATE_ACTIVE);' \
+        '  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);' \
+        '  for (uint16_t i = 0; i < len; ++i)' \
+        '    if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &out, &status)) printf("heartbeat type %d\n", mavlink_msg_heartbeat_get_type(&out));' \
+        '  return 0; }' > /tmp/consumer/heartbeat.c
+    - |
+      printf '%s\n' '#include <mavlink/v2.0/common/common.hpp>' '#include <iostream>' 'int main() {' \
+        '  mavlink::minimal::msg::HEARTBEAT heartbeat; heartbeat.type = 12;' \
+        '  std::cout << heartbeat.to_yaml() << std::endl; }' > /tmp/consumer/heartbeat.cpp
+    - cmake -S /tmp/consumer -B /tmp/consumer/build
+    - cmake --build /tmp/consumer/build
+    - /tmp/consumer/build/c_heartbeat | grep -Fx 'heartbeat type 12'
+    - "/tmp/consumer/build/cxx_heartbeat | grep -E '^ *type: 12$'"

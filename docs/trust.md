@@ -27,6 +27,8 @@ The tag must be an annotated, signed tag. A signed commit under an unsigned tag 
 
 Projects with `source: uscan` (e.g. moos-ivp) instead download the upstream release tarball that `debian/watch` finds, so nothing checks a maintainer's signature for them. New projects should use `source: git` with signed tags.
 
+[Dependency projects](dependencies.md) have no maintainers to sign them. Each one pins its source to a reviewed commit (`release.commit`) instead.
+
 ## Continuous builds: signed or merged heads
 
 A continuous build is made from the head of the project's default branch only if either:
