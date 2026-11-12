@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# A new push makes the running check for the same pull request moot: each run
+# checks the whole pull request, not just its latest push.
+concurrency:
+  group: check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: Lint and test ci/

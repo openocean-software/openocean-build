@@ -21,6 +21,8 @@ The install-test target is `install_test.target`: Ubuntu 26.04 amd64 unless a pr
 | `docs/`, `mkdocs.yml` or `README.md` only | No project (tests and docs only) | Nothing |
 | Anything else (`ci/`, `.github/`, `Makefile`, `defaults.yaml`, `docker/`, `keys/`, `trust/`, …) | Every project | Nothing |
 
+The check compares the whole pull request with its base, not just the latest push. So if the pull request changes the shared build anywhere, even a push that only touches `docs/` rebuilds every project. A newer push cancels the check still running for the same pull request.
+
 `check.yml` always lints and tests `ci/` and builds the docs. Which projects it builds:
 
 ```mermaid
