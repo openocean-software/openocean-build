@@ -48,7 +48,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
-          # continuous-version counts commits to projects/<project>/
+          # continuous-version counts commits to the project's directory
           fetch-depth: 0
 
       - name: Install tools

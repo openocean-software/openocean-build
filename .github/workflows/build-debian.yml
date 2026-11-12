@@ -27,7 +27,7 @@ on:
   workflow_call:
     inputs:
       project:
-        description: Project in projects/
+        description: Project in projects/ or dependencies/
         type: string
         required: true
       channel:
@@ -95,7 +95,7 @@ jobs:
           {
             echo "matrix=$(ci/project-config "${PROJECT}" matrix "${matrix_args[@]}")"
             # Names the publish job, so an approver sees what they approve
-            echo "version=${VERSION:-$(dpkg-parsechangelog -l "projects/${PROJECT}/debian/changelog" -S Version)}"
+            echo "version=${VERSION:-$(dpkg-parsechangelog -l "$(ci/project-config "${PROJECT}" dir)/debian/changelog" -S Version)}"
             echo "install_target=$(ci/project-config "${PROJECT}" get install_test.target)"
             echo "apt_url=$(ci/project-config "${PROJECT}" get apt_url)"
             for setting in prefix environment signing_key key; do

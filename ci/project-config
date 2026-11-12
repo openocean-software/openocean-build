@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Reads a project's settings: defaults.yaml merged with projects/<project>/project.yaml.
+"""Reads a project's settings: defaults.yaml merged with <dir>/<project>/project.yaml,
+where <dir> is projects/ (member projects) or dependencies/ (projects they need that
+aren't packaged elsewhere).
 
 Usage:
   project-config list                       JSON list of project names
+  project-config <project> dir              the project's directory, relative to the repository
   project-config <project> get <key.path>   one setting (scalars as text, the rest as JSON)
   project-config <project> matrix [--install-test-only]
                                             JSON list of build targets for strategy.matrix;
                                             install_test marks the install-test target
   project-config <project> install-script   install_test.commands as a bash script
   project-config <project> release-tag      upstream tag of the debian/changelog version
+                                            (empty for a project without tags)
+  project-config <project> release-commit   release.commit, after checking the changelog version
+                                            names it (empty if the project doesn't pin one)
   project-config <project> channel          channel that version publishes to (beta or release)
   project-config <project> continuous-version <git-dir> <commit>
                                             Debian version for a continuous build of <commit>
@@ -37,7 +43,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-PROJECTS_DIR = ROOT / "projects"
+PROJECT_DIRS = ("projects", "dependencies")
 SOURCES = {"uscan", "git"}
 
 
@@ -59,17 +65,32 @@ def load_yaml(path):
         return yaml.safe_load(f) or {}
 
 
-def list_projects(projects_dir=PROJECTS_DIR):
-    return sorted(p.parent.name for p in projects_dir.glob("*/project.yaml"))
+def list_projects(root=ROOT):
+    found = {}
+    for directory in PROJECT_DIRS:
+        for p in (root / directory).glob("*/project.yaml"):
+            if p.parent.name in found:
+                raise ConfigError(f"{p.parent.name} is in both {found[p.parent.name]}/ and {directory}/")
+            found[p.parent.name] = directory
+    return sorted(found)
+
+
+def project_dir(project, root=ROOT):
+    """The project's directory, relative to root."""
+    for directory in PROJECT_DIRS:
+        if (root / directory / project / "project.yaml").is_file():
+            return Path(directory) / project
+    raise ConfigError(f"no project '{project}' (expected {' or '.join(f'{d}/{project}/project.yaml' for d in PROJECT_DIRS)})")
+
+
+def load_unvalidated(project, root=ROOT):
+    return merge(load_yaml(root / "defaults.yaml"), load_yaml(root / project_dir(project, root) / "project.yaml"))
 
 
 def load(project, root=ROOT):
-    project_dir = root / "projects" / project
-    if not (project_dir / "project.yaml").is_file():
-        raise ConfigError(f"no project '{project}' (expected {project_dir}/project.yaml)")
-    if not (project_dir / "debian" / "changelog").is_file():
+    if not (root / project_dir(project, root) / "debian" / "changelog").is_file():
         raise ConfigError(f"{project}: missing debian/changelog")
-    config = merge(load_yaml(root / "defaults.yaml"), load_yaml(project_dir / "project.yaml"))
+    config = load_unvalidated(project, root)
     validate(project, config, root)
     return config
 
@@ -77,7 +98,11 @@ def load(project, root=ROOT):
 def validate(project, config, root=ROOT):
     if config.get("source") not in SOURCES:
         raise ConfigError(f"{project}: source must be one of {sorted(SOURCES)}, not {config.get('source')!r}")
-    if "{version}" not in str((config.get("upstream") or {}).get("tag_format", "")):
+    tag_format = (config.get("upstream") or {}).get("tag_format", "")
+    if tag_format is None:
+        if not (config.get("release") or {}).get("commit"):
+            raise ConfigError(f"{project}: upstream.tag_format null (no upstream tags) needs release.commit")
+    elif "{version}" not in str(tag_format):
         raise ConfigError(f"{project}: upstream.tag_format must contain {{version}}")
     if config["source"] == "git" and not config["upstream"].get("git"):
         raise ConfigError(f"{project}: source git needs upstream.git")
@@ -93,10 +118,11 @@ def validate(project, config, root=ROOT):
     if config["continuous"]["enabled"]:
         if config["source"] != "git":
             raise ConfigError(f"{project}: continuous builds need source git")
-        if not (root / "projects" / project / "maintainers.yaml").is_file():
-            raise ConfigError(f"{project}: continuous builds need projects/{project}/maintainers.yaml")
-    if config.get("release", {}).get("require_signed_tag") and not (root / "projects" / project / "maintainers.yaml").is_file():
-        raise ConfigError(f"{project}: release.require_signed_tag needs projects/{project}/maintainers.yaml")
+        if not (root / project_dir(project, root) / "maintainers.yaml").is_file():
+            raise ConfigError(f"{project}: continuous builds need {project_dir(project, root)}/maintainers.yaml")
+    if config.get("release", {}).get("require_signed_tag") and not (root / project_dir(project, root) / "maintainers.yaml").is_file():
+        raise ConfigError(f"{project}: release.require_signed_tag needs {project_dir(project, root)}/maintainers.yaml")
+    validate_pin(project, config, root)
     targets = config.get("targets", {})
     if not targets.get("arch") or not targets.get("dists"):
         raise ConfigError(f"{project}: targets.arch and targets.dists must not be empty")
@@ -110,6 +136,42 @@ def validate(project, config, root=ROOT):
     if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")
     validate_build_depends(project, config, root)
+
+
+def validate_pin(project, config, root=ROOT):
+    """Nobody we list signs a dependency's source, so the commit reviewed here is what's trusted."""
+    commit = config["release"].get("commit")
+    dependency = project_dir(project, root).parts[0] == "dependencies"
+    if not dependency:
+        if commit:
+            raise ConfigError(f"{project}: release.commit is for projects in dependencies/; a member project signs its tags")
+        return
+    if config["source"] != "git" or not commit:
+        raise ConfigError(f"{project}: a project in dependencies/ needs source git and release.commit")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(commit)):
+        raise ConfigError(f"{project}: release.commit must be a full 40-character commit hash, not {commit!r}")
+    if config["continuous"]["enabled"] or not config["release"].get("enabled", True):
+        raise ConfigError(f"{project}: a project in dependencies/ is released from release.commit only (no continuous builds)")
+
+
+SNAPSHOT_VERSION = re.compile(r"[0-9][0-9A-Za-z.~]*\+git(?P<date>[0-9]{8})\.(?P<sha>[0-9a-f]{7})(\+(dfsg|ds)[0-9]*)?")
+
+
+def pinned_commit(project, config, version):
+    """release.commit, after checking that the debian/changelog version names it.
+
+    Without upstream tags the version must be <base>+git<YYYYMMDD>.<sha>, with the
+    commit's date and abbreviated hash (fetch-source checks the date), so a new pin
+    is always a new, higher version.
+    """
+    commit = config["release"].get("commit")
+    if commit and config["upstream"]["tag_format"] is None:
+        match = SNAPSHOT_VERSION.fullmatch(version)
+        if not match:
+            raise ConfigError(f"{project}: {version} isn't <base>+git<YYYYMMDD>.<sha>, which a version without an upstream tag must be")
+        if match["sha"] != commit[:7]:
+            raise ConfigError(f"{project}: {version} names commit {match['sha']}, but release.commit is {commit[:7]}")
+    return commit or ""
 
 
 def validate_build_depends(project, config, root=ROOT):
@@ -127,11 +189,10 @@ def validate_build_depends(project, config, root=ROOT):
     for dependency in config["build_depends"]["projects"]:
         if dependency == project:
             raise ConfigError(f"{project}: build_depends.projects names the project itself")
-        if not (root / "projects" / dependency / "project.yaml").is_file():
+        if dependency not in list_projects(root):
             raise ConfigError(f"{project}: build_depends.projects names {dependency}, which isn't a project")
-        # Merged without validating, so a cycle can't recurse forever (build_order reports it)
-        dependency_config = merge(load_yaml(root / "defaults.yaml"),
-                                  load_yaml(root / "projects" / dependency / "project.yaml"))
+        # Unvalidated, so a cycle can't recurse forever (build_order reports it)
+        dependency_config = load_unvalidated(dependency, root)
         missing = targets - {(t["distro"], t["dist"], t["arch"]) for t in matrix(dependency_config)}
         if missing:
             listed = ", ".join("/".join(t) for t in sorted(missing))
@@ -175,8 +236,8 @@ def install_script(config):
 def build_order(projects, root=ROOT):
     """The projects, each after the ones it build-depends on, directly or through others."""
     depends = {}
-    for project in list_projects(root / "projects"):
-        config = merge(load_yaml(root / "defaults.yaml"), load_yaml(root / "projects" / project / "project.yaml"))
+    for project in list_projects(root):
+        config = load_unvalidated(project, root)
         depends[project] = set(config.get("build_depends", {}).get("projects") or [])
     order, done, visiting = [], set(), []
 
@@ -205,7 +266,7 @@ def build_order(projects, root=ROOT):
 def _all_dependencies(project, root=ROOT):
     seen, todo = set(), [project]
     while todo:
-        config = merge(load_yaml(root / "defaults.yaml"), load_yaml(root / "projects" / todo.pop() / "project.yaml"))
+        config = load_unvalidated(todo.pop(), root)
         for dependency in config.get("build_depends", {}).get("projects") or []:
             if dependency not in seen:
                 seen.add(dependency)
@@ -306,7 +367,7 @@ def write_sources(sources, directory, mounted_at=None, root=ROOT):
 
 
 def upstream_version(project, root=ROOT):
-    changelog = root / "projects" / project / "debian" / "changelog"
+    changelog = root / project_dir(project, root) / "debian" / "changelog"
     version = subprocess.run(["dpkg-parsechangelog", "-l", str(changelog), "-S", "Version"],
                              check=True, capture_output=True, text=True).stdout.strip()
     return version.split(":", 1)[-1].rsplit("-", 1)[0]
@@ -314,6 +375,8 @@ def upstream_version(project, root=ROOT):
 
 def release_tag(config, version):
     """Upstream tags have no repack suffix (+dfsg, +ds), and use prerelease_separator where Debian uses "~"."""
+    if config["upstream"]["tag_format"] is None:
+        return ""
     tag_version = re.sub(r"\+(dfsg|ds)[0-9]*$", "", version).replace("~", config["upstream"]["prerelease_separator"])
     return config["upstream"]["tag_format"].replace("{version}", tag_version)
 
@@ -334,7 +397,7 @@ def continuous_version(project, config, git_dir, commit, root=ROOT):
 
     Sorts above the last tag's release and below the next one. The commit count
     only grows along the default branch, and the revision changes whenever
-    projects/<project>/ changes, so a packaging change gets a new version.
+    the project's directory changes, so a packaging change gets a new version.
     Without a reachable tag the base is continuous.version_base (or 0) and the
     count is the whole history's.
     """
@@ -351,13 +414,13 @@ def continuous_version(project, config, git_dir, commit, root=ROOT):
         distances = {t: int(git("rev-list", "--count", f"{t}..{commit}")) for t in tags}
         tag = min(distances, key=distances.get)
         base, count = tag_version(config, tag), distances[tag]
-    revision = git("rev-list", "--count", "HEAD", "--", f"projects/{project}", cwd=root)
+    revision = git("rev-list", "--count", "HEAD", "--", str(project_dir(project, root)), cwd=root)
     return f"{base}+git{count}.g{sha}-0oos{revision}"
 
 
 def channel(config, version):
     beta_tags = config["release"].get("beta_tags")
-    if beta_tags and re.search(beta_tags, release_tag(config, version)):
+    if beta_tags and config["upstream"]["tag_format"] is not None and re.search(beta_tags, release_tag(config, version)):
         return "beta"
     if "~" in version:
         # "~" sorts before the release, so it must be a prerelease: never publish it as a release
@@ -376,6 +439,12 @@ def main(argv):
     if len(argv) >= 2 and argv[1] == "matrix" and argv[2:] in ([], ["--install-test-only"]):
         print(json.dumps(matrix(load(argv[0]), install_test_only=bool(argv[2:]))))
         return
+    if argv[1:] == ["dir"]:
+        print(project_dir(argv[0]))
+        return
+    if argv[1:] == ["release-commit"]:
+        print(pinned_commit(argv[0], load(argv[0]), upstream_version(argv[0])))
+        return
     if argv[1:] == ["install-script"]:
         print(install_script(load(argv[0])), end="")
         return
@@ -383,7 +452,9 @@ def main(argv):
         print(release_tag(load(argv[0]), upstream_version(argv[0])))
         return
     if argv[1:] == ["channel"]:
-        print(channel(load(argv[0]), upstream_version(argv[0])))
+        config, version = load(argv[0]), upstream_version(argv[0])
+        pinned_commit(argv[0], config, version)
+        print(channel(config, version))
         return
     if len(argv) == 4 and argv[1] == "continuous-version":
         print(continuous_version(argv[0], load(argv[0]), argv[2], argv[3]))

@@ -60,7 +60,9 @@ install_test:
 """
 
 
-class ProjectConfigTest(unittest.TestCase):
+class ProjectFixture(unittest.TestCase):
+    """A scratch openocean-build with the defaults above, to add projects to."""
+
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         (self.root / "defaults.yaml").write_text(DEFAULTS)
@@ -68,8 +70,8 @@ class ProjectConfigTest(unittest.TestCase):
             (self.root / key).parent.mkdir(exist_ok=True)
             (self.root / key).write_text(f"-----BEGIN PGP PUBLIC KEY BLOCK-----\n{key}\n")
 
-    def project(self, name, project_yaml, changelog=True):
-        d = self.root / "projects" / name
+    def project(self, name, project_yaml, changelog=True, directory="projects"):
+        d = self.root / directory / name
         (d / "debian").mkdir(parents=True, exist_ok=True)
         (d / "project.yaml").write_text(textwrap.dedent(project_yaml))
         if changelog:
@@ -79,6 +81,8 @@ class ProjectConfigTest(unittest.TestCase):
     def load(self, name):
         return project_config.load(name, root=self.root)
 
+
+class ProjectConfigTest(ProjectFixture):
     def test_project_overrides_merge_into_defaults(self):
         config = self.load(self.project("p", """
             source: uscan
@@ -333,10 +337,117 @@ class ProjectConfigTest(unittest.TestCase):
         # The Makefile, fetch-source and continuous-heads all find a project's files by its source package name
         for name in project_config.list_projects():
             with self.subTest(project=name):
-                changelog = ROOT / "projects" / name / "debian" / "changelog"
+                changelog = ROOT / project_config.project_dir(name) / "debian" / "changelog"
                 source = subprocess.run(["dpkg-parsechangelog", "-l", str(changelog), "-S", "Source"],
                                         check=True, capture_output=True, text=True).stdout.strip()
                 self.assertEqual(source, name)
+
+
+    def test_every_real_dependency_version_names_its_pinned_commit(self):
+        for name in project_config.list_projects():
+            config = project_config.load(name)
+            if config["release"]["commit"]:
+                with self.subTest(project=name):
+                    project_config.pinned_commit(name, config, project_config.upstream_version(name))
+
+
+class DependencyProjectTest(ProjectFixture):
+    """Projects in dependencies/: found next to projects/, and released from a pinned commit."""
+
+    COMMIT = "4b03484ee7b296c8f1ecd50ece4b9893baff90e8"
+
+    def dependency(self, name="dep", extra=""):
+        return self.project(name, f"""
+            upstream:
+              git: https://example.org/dep.git
+              tag_format: null
+            source: git
+            release:
+              commit: {self.COMMIT}
+            {extra}""", directory="dependencies")
+
+    def test_projects_are_listed_from_both_directories(self):
+        self.project("member", "source: uscan\n")
+        self.dependency()
+        self.assertEqual(project_config.list_projects(self.root), ["dep", "member"])
+        self.assertEqual(str(project_config.project_dir("dep", self.root)), "dependencies/dep")
+        self.assertEqual(str(project_config.project_dir("member", self.root)), "projects/member")
+        self.load("dep")
+
+    def test_a_name_in_both_directories_is_refused(self):
+        self.project("dep", "source: uscan\n")
+        self.dependency()
+        with self.assertRaisesRegex(project_config.ConfigError, "dep is in both projects/ and dependencies/"):
+            project_config.list_projects(self.root)
+
+    def test_a_dependency_needs_a_full_pinned_commit(self):
+        self.project("dep", """
+            upstream: { git: https://example.org/dep.git }
+            source: git
+            """, directory="dependencies")
+        with self.assertRaisesRegex(project_config.ConfigError, "needs source git and release.commit"):
+            self.load("dep")
+        self.project("dep", """
+            upstream: { git: https://example.org/dep.git }
+            source: git
+            release: { commit: 4b03484 }
+            """, directory="dependencies")
+        with self.assertRaisesRegex(project_config.ConfigError, "full 40-character commit hash"):
+            self.load("dep")
+
+    def test_a_dependency_has_no_continuous_builds(self):
+        self.dependency(extra="continuous: { enabled: true }")
+        (self.root / "dependencies" / "dep" / "maintainers.yaml").write_text("maintainers: []\n")
+        with self.assertRaisesRegex(project_config.ConfigError, "released from release.commit only"):
+            self.load("dep")
+
+    def test_a_member_project_cant_pin_a_commit(self):
+        # Members sign their tags (the plan's Decision 7): no pinned-snapshot path for them
+        self.project("member", f"""
+            upstream: {{ git: https://example.org/member.git }}
+            source: git
+            release: {{ commit: {self.COMMIT} }}
+            """)
+        with self.assertRaisesRegex(project_config.ConfigError, "release.commit is for projects in dependencies/"):
+            self.load("member")
+
+    def test_no_tags_needs_a_pinned_commit(self):
+        self.project("member", "upstream: { git: https://example.org/m.git, tag_format: null }\nsource: git\n")
+        with self.assertRaisesRegex(project_config.ConfigError, "tag_format null .* needs release.commit"):
+            self.load("member")
+
+    def test_an_untagged_version_must_name_the_pinned_commit(self):
+        config = self.load(self.dependency())
+        for version in ("2.0.0+git20260507.4b03484", "2.0.0~rc1+git20260507.4b03484", "0+git20260507.4b03484+dfsg1"):
+            with self.subTest(version=version):
+                self.assertEqual(project_config.pinned_commit("dep", config, version), self.COMMIT)
+        for version, error in [("2.0.0", "isn't <base>\\+git<YYYYMMDD>.<sha>"),
+                               ("2.0.0+20260507", "isn't"),
+                               ("2.0.0+git2026057.4b03484", "isn't"),
+                               ("2.0.0+git20260507.1234567", "names commit 1234567, but release.commit is 4b03484")]:
+            with self.subTest(version=version), self.assertRaisesRegex(project_config.ConfigError, error):
+                project_config.pinned_commit("dep", config, version)
+
+    def test_an_untagged_release_has_no_tag_and_publishes_to_release(self):
+        config = self.load(self.dependency())
+        self.assertEqual(project_config.release_tag(config, "2.0.0+git20260507.4b03484"), "")
+        self.assertEqual(project_config.channel(config, "2.0.0+git20260507.4b03484"), "release")
+
+    def test_a_tagged_dependency_keeps_its_tag(self):
+        config = self.load(self.project("dep", f"""
+            upstream: {{ git: https://example.org/dep.git }}
+            source: git
+            release: {{ commit: {self.COMMIT} }}
+            """, directory="dependencies"))
+        self.assertEqual(project_config.release_tag(config, "4.15.0"), "v4.15.0")
+        # Any version goes: fetch-source checks the tag points at the commit
+        self.assertEqual(project_config.pinned_commit("dep", config, "4.15.0"), self.COMMIT)
+
+    def test_a_member_can_build_depend_on_a_dependency(self):
+        self.dependency()
+        self.project("member", "source: uscan\nbuild_depends: { projects: [dep] }\n")
+        self.load("member")
+        self.assertEqual(project_config.build_order(["member", "dep"], self.root), ["dep", "member"])
 
 
 if __name__ == "__main__":

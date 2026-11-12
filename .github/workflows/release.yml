@@ -14,10 +14,11 @@ on:
       - main
     paths:
       - projects/*/debian/changelog
+      - dependencies/*/debian/changelog
   workflow_dispatch:
     inputs:
       project:
-        description: Project in projects/ to build and publish
+        description: Project (in projects/ or dependencies/) to build and publish
         type: string
         required: true
 
@@ -53,13 +54,13 @@ jobs:
           if [ -n "${REQUESTED}" ]; then
             projects=("${REQUESTED}")
           else
-            mapfile -t projects < <(git diff --name-only "${BEFORE}" "${GITHUB_SHA}" -- 'projects/*/debian/changelog' | cut -d/ -f2 | sort -u)
+            mapfile -t projects < <(git diff --name-only "${BEFORE}" "${GITHUB_SHA}" -- 'projects/*/debian/changelog' 'dependencies/*/debian/changelog' | cut -d/ -f2 | sort -u)
           fi
           # Dependencies first: the matrix runs one release at a time, in this order
           if [ ${#projects[@]} -gt 0 ]; then
             mapfile -t projects < <(ci/project-config order "${projects[@]}" | python3 -c 'import json, sys; print(*json.load(sys.stdin), sep="\n")')
           fi
-          # Each project's channel comes from its changelog version's upstream tag.
+          # Each project's channel comes from its changelog version's upstream tag (or pinned commit).
           releases=()
           for project in "${projects[@]}"; do
             if [ "$(ci/project-config "${project}" get release.enabled)" != true ]; then
@@ -67,7 +68,7 @@ jobs:
               continue
             fi
             channel=$(ci/project-config "${project}" channel)
-            echo "${project} $(ci/project-config "${project}" release-tag) -> ${channel}"
+            echo "${project} $(ci/project-config "${project}" release-tag) $(ci/project-config "${project}" release-commit) -> ${channel}"
             releases+=("${project}:${channel}")
           done
           echo "releases=$(printf '%s\n' "${releases[@]}" | python3 -c '

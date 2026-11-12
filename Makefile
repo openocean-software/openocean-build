@@ -2,7 +2,7 @@
 # local testing only -- resulting packages are left unsigned (-uc -us)
 # unless SIGN_KEY is set (see below).
 #
-# All commands require OOS_PACKAGE to be set to a project in projects/,
+# All commands require OOS_PACKAGE to be set to a project in projects/ or dependencies/,
 # e.g. "export OOS_PACKAGE=moos-ivp". Fetching the source needs
 # python3-yaml and devscripts on the host (see ci/fetch-source).
 #
@@ -45,12 +45,12 @@ ifndef OOS_PACKAGE
 $(error OOS_PACKAGE is not set. Please run: export OOS_PACKAGE=<package name>)
 endif
 
-PROJECT_DIR   := projects/$(OOS_PACKAGE)
+PROJECT_DIR   := $(patsubst %/project.yaml,%,$(firstword $(wildcard projects/$(OOS_PACKAGE)/project.yaml dependencies/$(OOS_PACKAGE)/project.yaml)))
 DEBIAN_DIR    ?= $(PROJECT_DIR)/debian
 SOURCE_REF    ?=
 
-ifeq ($(wildcard $(PROJECT_DIR)/project.yaml),)
-$(error No project '$(OOS_PACKAGE)': expected $(PROJECT_DIR)/project.yaml)
+ifeq ($(PROJECT_DIR),)
+$(error No project '$(OOS_PACKAGE)': expected projects/$(OOS_PACKAGE)/project.yaml or dependencies/$(OOS_PACKAGE)/project.yaml)
 endif
 
 # DISTRO selects the .deb-based distribution family to build against; it is

@@ -7,6 +7,10 @@
 #   --ref         (source: git) fetch this commit instead of the release tag.
 #                 Its signature isn't checked here: whoever picks the commit
 #                 must have verified it (see continuous.yml).
+#
+# With release.commit (a project in dependencies/), the release tag must point
+# at that commit; without upstream tags, the commit itself is fetched and the
+# version must carry its date and hash.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -22,7 +26,7 @@ done
 project=${1:?usage: fetch-source [--debian-dir <dir>] [--ref <commit>] <project> <destdir>}
 destdir=${2:?usage: fetch-source [--debian-dir <dir>] [--ref <commit>] <project> <destdir>}
 config="${root}/ci/project-config"
-project_dir="${root}/projects/${project}"
+project_dir="${root}/$("${config}" "${project}" dir)"
 debian_dir=${debian_dir:-${project_dir}/debian}
 
 changelog="${debian_dir}/changelog"
@@ -48,21 +52,52 @@ case "${source_method}" in
     git)
         work=$(mktemp -d)
         trap 'rm -rf "${work}"' EXIT
-        git init -q "${work}/repo"
+        repo=${work}/repo
+        git init -q "${repo}"
         upstream_git=$("${config}" "${project}" get upstream.git)
         if [ -n "${ref}" ]; then
-            git -C "${work}/repo" fetch -q --depth 1 "${upstream_git}" "${ref}"
+            git -C "${repo}" fetch -q --depth 1 "${upstream_git}" "${ref}"
             archive_ref=FETCH_HEAD
         else
             tag=$("${config}" "${project}" release-tag)
-            git -C "${work}/repo" fetch -q --depth 1 "${upstream_git}" "refs/tags/${tag}:refs/tags/${tag}"
-            if [ "$("${config}" "${project}" get release.require_signed_tag)" = true ]; then
-                "${root}/ci/verify-signature" "${project}" "${work}/repo" "refs/tags/${tag}"
+            commit=$("${config}" "${project}" release-commit)
+            if [ -n "${tag}" ]; then
+                git -C "${repo}" fetch -q --depth 1 "${upstream_git}" "refs/tags/${tag}:refs/tags/${tag}"
+                if [ "$("${config}" "${project}" get release.require_signed_tag)" = true ]; then
+                    "${root}/ci/verify-signature" "${project}" "${repo}" "refs/tags/${tag}"
+                fi
+                archive_ref=refs/tags/${tag}
+            else
+                git -C "${repo}" fetch -q --depth 1 "${upstream_git}" "${commit}"
+                archive_ref=FETCH_HEAD
             fi
-            archive_ref=refs/tags/${tag}
+            if [ -n "${commit}" ]; then
+                fetched=$(git -C "${repo}" rev-parse "${archive_ref}^{commit}")
+                if [ "${fetched}" != "${commit}" ]; then
+                    echo "fetch-source: ${tag:-upstream} is commit ${fetched}, not release.commit ${commit}" >&2
+                    exit 1
+                fi
+                if [ -z "${tag}" ]; then
+                    date=$(TZ=UTC git -C "${repo}" show -s --format=%cd --date=format-local:%Y%m%d "${commit}")
+                    if [[ "${upstream_version}" != *"+git${date}.${commit:0:7}"* ]]; then
+                        echo "fetch-source: ${commit:0:7} was committed on ${date}, but the version is ${upstream_version}" >&2
+                        exit 1
+                    fi
+                fi
+                echo "fetch-source: ${tag:-the source} is release.commit ${commit}"
+            fi
         fi
-        git -C "${work}/repo" archive --format=tar --prefix="${source}-${upstream_version}/" "${archive_ref}" \
-            | gzip -n > "${work}/${source}-${upstream_version}.tar.gz"
+        prefix="${source}-${upstream_version}/"
+        git -C "${repo}" archive --format=tar --prefix="${prefix}" "${archive_ref}" > "${work}/source.tar"
+        if [ "$("${config}" "${project}" get upstream.submodules)" = true ]; then
+            # At the commits the source records, so the pin covers them too
+            git -C "${repo}" checkout -q --detach "${archive_ref}"
+            git -C "${repo}" submodule update -q --init --recursive --depth 1
+            # shellcheck disable=SC2016  # expanded by submodule foreach's shell
+            PREFIX=${prefix} WORK=${work} git -C "${repo}" submodule foreach -q --recursive \
+                'git archive --format=tar --prefix="${PREFIX}${displaypath}/" HEAD > "${WORK}/submodule.tar" && tar --concatenate -f "${WORK}/source.tar" "${WORK}/submodule.tar"'
+        fi
+        gzip -n < "${work}/source.tar" > "${work}/${source}-${upstream_version}.tar.gz"
         # mk-origtargz applies debian/copyright's Files-Excluded, as uscan does.
         mk-origtargz --package "${source}" --version "${upstream_version}" --compression gzip --copy \
             --copyright-file "${project_dir}/debian/copyright" --directory "${destdir}" \
