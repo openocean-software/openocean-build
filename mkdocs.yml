@@ -9,6 +9,7 @@ nav:
   - Home: index.md
   - Installing packages: installing.md
   - Channels: channels.md
+  - CI: ci.md
   - Signing and trust: trust.md
   - Keys: keys.md
   - Continuous builds: continuous.md
