@@ -13,6 +13,7 @@ nav:
   - Keys: keys.md
   - Continuous builds: continuous.md
   - Projects: projects.md
+  - Dependency projects: dependencies.md
   - Build dependencies: build-dependencies.md
 
 markdown_extensions:

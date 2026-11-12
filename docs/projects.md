@@ -17,7 +17,7 @@ Each project is a directory in `projects/`, named after its Debian source packag
 - `debian/`: the Debian packaging. Its `changelog` version is what gets released, with `trixie` as the distribution.
 - `maintainers.yaml` and `keys/`: the people whose signatures are trusted for this project (see [Signing and trust](trust.md)).
 
-A project whose packages build-depend on another project's, or on an external repository's, lists them under `build_depends` (see [Build dependencies](build-dependencies.md)).
+A project whose packages build-depend on another project's, or on an external repository's, lists them under `build_depends` (see [Build dependencies](build-dependencies.md)). Software a member project needs that isn't packaged elsewhere is a [dependency project](dependencies.md), in `dependencies/`.
 
 `moos-ivp-helm` is the IvP helm libraries built without MOOS (`IVP_BUILD_HELM_LIBS_ONLY`, from MOOS-IvP master with [moos-ivp/moos-ivp#147](https://github.com/moos-ivp/moos-ivp/pull/147)), installed under `/usr/lib/<multiarch>/ivp-helm` so they coexist with the `libmoos-ivp` packages; `find_package(IVP CONFIG)` finds them with that prefix in `CMAKE_PREFIX_PATH`. The branch has no tags of its own, so the project is snapshots only.
 
