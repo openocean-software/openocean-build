@@ -246,6 +246,16 @@ class ScorecardTest(unittest.TestCase):
         self.assertEqual(card["via"], "scorecard")
         self.assertIsNone(scan.scorecard(SOURCE, None, api, run))
 
+    def test_a_check_that_could_not_run_keeps_the_rest_of_the_result(self):
+        api = FakeApi({("GET", f"{scan.SCORECARD_API}/github.com/o/p"): (404, None)})
+        partial = {"score": 4.5, "checks": [{"name": "Branch-Protection", "score": -1}, {"name": "SAST", "score": 0}]}
+
+        def run(args, **kwargs):
+            return subprocess.CompletedProcess(args, 1, stdout=json.dumps(partial),
+                                               stderr="one or more checks failed during execution")
+        card = scan.scorecard(SOURCE, "/bin/scorecard", api, run)
+        self.assertEqual((card["score"], card["checks"]), (4.5, {"Branch-Protection": -1, "SAST": 0}))
+
     def test_a_failed_scorecard_run_leaves_the_repository_unscored(self):
         api = FakeApi({("GET", f"{scan.SCORECARD_API}/github.com/o/p"): (404, None)})
 

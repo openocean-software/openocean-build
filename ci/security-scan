@@ -217,10 +217,15 @@ def scorecard(source, scorecard_bin=None, request=http, run=subprocess.run):
             return None
         done = run([scorecard_bin, f"--repo=github.com/{slug}", "--format=json", "--show-details=false"],
                    capture_output=True, text=True)
-        if done.returncode != 0:
+        # A check it can't run (Branch-Protection needs an admin token) fails the
+        # command but still scores -1 in a complete result
+        try:
+            result = json.loads(done.stdout)
+            result["score"]
+        except (ValueError, KeyError, TypeError):
             print(f"security-scan: scorecard failed for {slug}: {done.stderr.strip()[-300:]}", file=sys.stderr)
             return None
-        result, via = json.loads(done.stdout), "scorecard"
+        via = "scorecard"
     return {"score": result["score"], "date": result.get("date", ""), "via": via,
             "checks": {c["name"]: c["score"] for c in result.get("checks", [])}}
 
