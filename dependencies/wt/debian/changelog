@@ -1,0 +1,7 @@
+wt (4.15.0-0oos1) trixie; urgency=medium
+
+  * Package Wt for openocean-build, from upstream tag 4.15.0 and the
+    packaging GobySoft publishes for 4.13.2.
+  * Don't build the examples and tests, which aren't packaged or run.
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 10:00:00 +1100

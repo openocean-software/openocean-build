@@ -1,0 +1,30 @@
+# Wt, for goby3's web GUI (liaison). Upstream tags releases (4.15.0) but
+# doesn't sign them, so the tag must point at the commit pinned here.
+upstream:
+  git: https://github.com/emweb/wt.git
+  tag_format: "{version}"
+source: git
+release:
+  commit: 43a1b94e827196ae47a0bdc3ecd3c19f0a89c919
+
+install_test:
+  packages: [cmake, g++, make, curl]
+  commands:
+    # A Wt application, built with find_package(wt), serves its page over HTTP
+    - mkdir -p /tmp/hello
+    - |
+      printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(hello CXX)' 'find_package(wt CONFIG REQUIRED)' \
+        'add_executable(hello hello.cpp)' 'target_link_libraries(hello Wt::Wt Wt::HTTP)' > /tmp/hello/CMakeLists.txt
+    - |
+      printf '%s\n' '#include <Wt/WApplication.h>' '#include <Wt/WText.h>' \
+        'int main(int argc, char **argv) {' \
+        '  return Wt::WRun(argc, argv, [](const Wt::WEnvironment &env) {' \
+        '    auto app = std::make_unique<Wt::WApplication>(env);' \
+        '    app->setTitle("openocean hello");' \
+        '    app->root()->addNew<Wt::WText>("hello from Wt");' \
+        '    return app; }); }' > /tmp/hello/hello.cpp
+    - cmake -S /tmp/hello -B /tmp/hello/build
+    - cmake --build /tmp/hello/build
+    - (/tmp/hello/build/hello --docroot /usr/share/Wt --http-listen 127.0.0.1:8080 > /tmp/hello/log 2>&1 &)
+    - for i in $(seq 1 20); do curl -sf http://127.0.0.1:8080/ > /tmp/hello/page && break; sleep 1; done
+    - grep -F '<title>openocean hello</title>' /tmp/hello/page
