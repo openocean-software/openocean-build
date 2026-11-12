@@ -1,0 +1,25 @@
+# libais, for goby3's AIS support. Upstream's "version 0.17" commit was never
+# tagged (its last tag is v0.15), so the release is that commit, pinned here.
+# A new upstream release is requested in schwehr/libais#253: once tagged, set
+# tag_format and drop the patches upstream's CMake install now covers.
+upstream:
+  git: https://github.com/schwehr/libais.git
+  tag_format: null
+source: git
+release:
+  commit: 4e9b6d6ae4ee02ed2bdb4a9d7835cff4780287d5
+
+install_test:
+  packages: [g++]
+  commands:
+    # Decode a position report from an NMEA sentence (vdm.h) and its payload (ais.h)
+    - |
+      printf '%s\n' '#include <ais.h>' '#include <vdm.h>' '#include <iostream>' 'int main() {' \
+        '  libais::VdmStream stream;' \
+        '  stream.AddLine("!AIVDM,1,1,,A,100WhdhP0nJRdiFFHFvm??v00L12,0*13");' \
+        '  auto msg = stream.PopOldestMessage();' \
+        '  if (!msg) return 1;' \
+        '  libais::Ais1_2_3 report("100WhdhP0nJRdiFFHFvm??v00L12", 0);' \
+        '  std::cout << "message " << msg->message_id << " mmsi " << msg->mmsi << " sog " << report.sog << std::endl; }' > /tmp/decode.cpp
+    - g++ -o /tmp/decode /tmp/decode.cpp -lais
+    - /tmp/decode | grep -Fx 'message 1 mmsi 651443 sog 5.4'

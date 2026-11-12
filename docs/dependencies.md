@@ -7,6 +7,7 @@ A dependency project packages software that a member project needs but that Debi
 | Project | Upstream | Release |
 |---|---|---|
 | mavlink | [mavlink/mavlink](https://github.com/mavlink/mavlink), with the pymavlink submodule | commit of master (no upstream tags) |
+| libais | [schwehr/libais](https://github.com/schwehr/libais) | its untagged "version 0.17" commit ([schwehr/libais#253](https://github.com/schwehr/libais/issues/253) asks for a release) |
 
 ## Trusting a pinned commit
 

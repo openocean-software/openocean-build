@@ -1,0 +1,18 @@
+Description: Install vdm.h too, and give libais a SONAME
+ Upstream installs only ais.h, but VdmStream (vdm.h) is how a client reads
+ NMEA sentences. Upstream sets no SOVERSION; libais.so.1 matches the
+ packages GobySoft has published.
+Author: Toby Schneider <toby@gobysoft.org>
+Forwarded: no
+---
+--- a/src/libais/CMakeLists.txt
++++ b/src/libais/CMakeLists.txt
+@@ -34,7 +34,7 @@
+ vdm.cpp
+ )
+ target_include_directories(ais PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+-set_target_properties(ais PROPERTIES PUBLIC_HEADER ais.h)
++set_target_properties(ais PROPERTIES PUBLIC_HEADER "ais.h;vdm.h" VERSION 0.17 SOVERSION 1)
+ 
+ include(GNUInstallDirs)
+ 
