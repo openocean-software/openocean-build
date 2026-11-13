@@ -1,0 +1,6 @@
+ivpico (0.0.0-1) trixie; urgency=medium
+
+  * IvPico, the IvP helm as a Goby app. Only continuous snapshots are built
+    (release.enabled false); this entry is their base.
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 16:00:00 +1100

@@ -10,6 +10,7 @@
 | moos-ivp-helm | [GobySoft/moos-ivp](https://github.com/GobySoft/moos-ivp), branch `ivp-without-moos` | git | none: snapshots only | every 6 hours |
 | goby3 | [GobySoft/goby3](https://github.com/GobySoft/goby3) | git, signed tags | release | on each push |
 | netsim | [GobySoft/netsim](https://github.com/GobySoft/netsim) | git, signed tags | release | every 6 hours |
+| ivpico | [GobySoft/ivpico](https://github.com/GobySoft/ivpico) | git | none: snapshots only | every 6 hours |
 
 ## Adding a project
 
