@@ -3,6 +3,7 @@ Priority: extra
 Maintainer: Toby Schneider <toby@gobysoft.org>
 Build-Depends: debhelper-compat (= 13),
                cmake (>= 3.5.1~),
+               chrpath,
                libboost-dev (>= 1.58~), 
                libboost-system-dev (<< 1.69~) | libboost-dev (>= 1.69~),
                libboost-process-dev (>= 1.86~) | libboost-dev (<< 1.86~),

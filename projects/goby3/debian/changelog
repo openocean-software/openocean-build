@@ -1,3 +1,13 @@
+goby3 (3.7.0-2) trixie; urgency=high
+
+  * Strip the build tree's RUNPATH from the installed programs and
+    libraries, which upstream installs straight from the build tree.
+  * Frontseat wrapper scripts (iFrontSeat_*, goby_frontseat_interface_*): stop
+    setting LD_LIBRARY_PATH, which named the build tree and, when unset, the
+    current directory; and pass arguments with "$@".
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 03:46:48 +0000
+
 goby3 (3.7.0-1) trixie; urgency=medium
 
   * Package goby3 for openocean-build, from upstream tag 3.7.0 and the
