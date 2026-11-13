@@ -1,0 +1,84 @@
+Description: Bound and validate the mux header in Demuxer::addMuxPacket
+ BHV_IPF demultiplexer trusts attacker-declared packet counts
+Origin: upstream, https://github.com/moos-ivp/moos-ivp/commit/1db7a5d19ffc5dfec66e121af320cbcff24361bc
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/1db7a5d19ffc5dfec66e121af320cbcff24361bc
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85445
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_ivpbuild/Demuxer.cpp b/ivp/src/lib_ivpbuild/Demuxer.cpp
+index f1f97ac7..4f0f1837 100644
+--- a/ivp/src/lib_ivpbuild/Demuxer.cpp
++++ b/ivp/src/lib_ivpbuild/Demuxer.cpp
+@@ -92,32 +92,52 @@ bool Demuxer::addMuxPacket(const string& str, double time_stamp,
+   // is labeled not up-to-date by setting demuxed=false. 
+   m_demuxed = false;
+ 
++  // The header is read from a MOOS variable, so nothing about it can be
++  // assumed: the delimiters may be missing and the numbers may be anything.
++  const int slen = (int)str.length();
++
+   // Determine the "ID" of the string
+   int cix = 2;
+   string str_id = "";
+-  while(str[cix] != ',') {
++  while((cix < slen) && (str[cix] != ',')) {
+     str_id += str[cix];
+     cix++;
+   }
++  if(cix >= slen)
++    return(false);
+ 
+   // Determine the number of total packets
+   cix++;
+   int str_total = 0;
+-  while(str[cix] != ',') {
++  while((cix < slen) && (str[cix] != ',')) {
++    if((str[cix] < '0') || (str[cix] > '9'))
++      return(false);
+     str_total *= 10;
+     str_total += (int)(str[cix]-48);
++    if(str_total > MAX_MUX_PACKETS)
++      return(false);
+     cix++;
+   }
++  if((cix >= slen) || (str_total < 1))
++    return(false);
+ 
+   // Determine the index of this packet
+   cix++;
+   int str_ix = 0;
+-  while(str[cix] != ',') {
++  while((cix < slen) && (str[cix] != ',')) {
++    if((str[cix] < '0') || (str[cix] > '9'))
++      return(false);
+     str_ix *= 10;
+     str_ix += (int)(str[cix]-48);
++    if(str_ix > str_total)
++      return(false);
+     cix++;
+   }
++  if(cix >= slen)
++    return(false);
+   str_ix--;
++  if(str_ix < 0)
++    return(false);
+   cix++;
+   
+   string str_body = str.c_str() + cix;
+diff --git a/ivp/src/lib_ivpbuild/Demuxer.h b/ivp/src/lib_ivpbuild/Demuxer.h
+index 1277189d..c21cf1b8 100644
+--- a/ivp/src/lib_ivpbuild/Demuxer.h
++++ b/ivp/src/lib_ivpbuild/Demuxer.h
+@@ -31,6 +31,12 @@
+ #include "DemuxUnit.h"
+ #include "DemuxedResult.h"
+ 
++// The largest number of packets one multiplexed string may declare.  The
++// figure arrives in the payload and each packet reserves a std::string in the
++// DemuxUnit, so it needs a ceiling.  A real IvP function is a handful of
++// packets; this is generous.
++#define MAX_MUX_PACKETS 1024
++
+ class Demuxer {
+ public:
+   Demuxer() {m_demuxed=true;}

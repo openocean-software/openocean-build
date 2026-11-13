@@ -1,0 +1,36 @@
+Description: alogsplit: create the split directory without a shell
+Origin: upstream, https://github.com/moos-ivp/moos-ivp/commit/5b054c36f5a4a6d37b3bc0c010e42080a822d399
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/5b054c36f5a4a6d37b3bc0c010e42080a822d399
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85439
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_logutils/SplitHandler.cpp b/ivp/src/lib_logutils/SplitHandler.cpp
+index 3ca8083b..31f9c639 100644
+--- a/ivp/src/lib_logutils/SplitHandler.cpp
++++ b/ivp/src/lib_logutils/SplitHandler.cpp
+@@ -23,6 +23,10 @@
+ 
+ #include <iostream>
+ #include <cstdlib>
++#include <cerrno>
++#include <cstring>
++#include <sys/stat.h>
++#include <sys/types.h>
+ #include <cstdio>
+ #include <cmath>
+ #include "MBUtils.h"
+@@ -446,10 +450,10 @@ bool SplitHandler::handlePreCheckSplitDir()
+ 
+   // Part 3: Create and Verify the split directory.
+   // Make the base directory
+-  string cmd = "mkdir " + basedir;
+-  int result = system(cmd.c_str());
+-  if(result != 0) 
+-    cout << "Possible err in SplitHandler syscmd mkdir" << endl;
++  int result = mkdir(basedir.c_str(), 0755);
++  if(result != 0)
++    cout << "Possible err in SplitHandler mkdir: "
++	 << strerror(errno) << endl;
+ 
+   
+   // Ensure that the base directory has indeed been created.

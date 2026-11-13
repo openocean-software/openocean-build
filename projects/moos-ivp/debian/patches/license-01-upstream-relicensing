@@ -1,0 +1,950 @@
+Description: Relicence the beta-licensed and mixed-licence library files
+ PMGen, PMGen_Dubins, PMGen_Holonomic, PlatModelGenerator, VelocityFilter
+ and BHV_FixTurn carried an "unreleased BETA code" header that withheld
+ permission to distribute. Upstream relicensed them, and aligned the
+ licences of other library files, in 90d6607. Only comment headers change.
+ .
+ Backported to 24.8.1 without upstream's changes to JsonUtils and
+ SurveyGenerator, which 24.8.1 doesn't have.
+Author: HeroCC <2124489+HeroCC@users.noreply.github.com>
+Origin: backport, https://github.com/moos-ivp/moos-ivp/commit/90d6607e75f1d66340b8dc304f17013748f7a751
+Applied-Upstream: 90d6607e75f1d66340b8dc304f17013748f7a751
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_behaviors-colregs/VelocityFilter.cpp b/ivp/src/lib_behaviors-colregs/VelocityFilter.cpp
+index ec32d117..becd8621 100644
+--- a/ivp/src/lib_behaviors-colregs/VelocityFilter.cpp
++++ b/ivp/src/lib_behaviors-colregs/VelocityFilter.cpp
+@@ -1,13 +1,25 @@
+-/***************************************************************/
+-/*    NAME: Michael Benjamin                                   */
+-/*    ORGN: MIT, Cambridge MA                                  */
+-/*    FILE: VelocityFilter.cpp                                 */
+-/*    DATE: Apr 23rd, 2022                                     */
+-/*                                                             */
+-/* This is unreleased BETA code. No permission is granted or   */
+-/* implied to use, copy, modify, and distribute this software  */
+-/* except by the author(s), or those designated by the author. */
+-/***************************************************************/
++/*****************************************************************/
++/*    NAME: Michael Benjamin                                     */
++/*    ORGN: MIT, Cambridge MA                                    */
++/*    FILE: VelocityFilter.cpp                                   */
++/*    DATE: Apr 23rd, 2022                                       */
++/*                                                               */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #include <vector>
+ #include <iterator>
+diff --git a/ivp/src/lib_behaviors-colregs/VelocityFilter.h b/ivp/src/lib_behaviors-colregs/VelocityFilter.h
+index 6b096fcb..f6007ec7 100644
+--- a/ivp/src/lib_behaviors-colregs/VelocityFilter.h
++++ b/ivp/src/lib_behaviors-colregs/VelocityFilter.h
+@@ -1,13 +1,25 @@
+-/***************************************************************/
+-/*    NAME: Michael Benjamin                                   */
+-/*    ORGN: MIT, Cambridge MA                                  */
+-/*    FILE: VelocityFilter.h                                   */
+-/*    DATE: Apr 23rd, 2022                                     */
+-/*                                                             */
+-/* This is unreleased BETA code. No permission is granted or   */
+-/* implied to use, copy, modify, and distribute this software  */
+-/* except by the author(s), or those designated by the author. */
+-/***************************************************************/
++/*****************************************************************/
++/*    NAME: Michael Benjamin                                     */
++/*    ORGN: MIT, Cambridge MA                                    */
++/*    FILE: VelocityFilter.h                                     */
++/*    DATE: Apr 23rd, 2022                                       */
++/*                                                               */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #ifndef VELOCITY_FILTER_HEADER
+ #define VELOCITY_FILTER_HEADER
+diff --git a/ivp/src/lib_behaviors-marine/BHV_PModelView.cpp b/ivp/src/lib_behaviors-marine/BHV_PModelView.cpp
+index 0d6dea0b..7f446cea 100644
+--- a/ivp/src/lib_behaviors-marine/BHV_PModelView.cpp
++++ b/ivp/src/lib_behaviors-marine/BHV_PModelView.cpp
+@@ -1,9 +1,25 @@
+-/*********************************************************/
+-/*    NAME: Michael Benjamin                             */
+-/*    ORGN: Dept of Mechanical Eng, MIT Cambridge MA     */
+-/*    FILE: BHV_PModelView.cpp                           */
+-/*    DATE: Nov 3rd 2023                                 */
+-/*********************************************************/
++/*****************************************************************/
++/*    NAME: Michael Benjamin                                     */
++/*    ORGN: Dept of Mechanical Engineering, MIT, Cambridge MA    */
++/*    FILE: BHV_PModelView.cpp                                   */
++/*    DATE: Nov 3rd, 2023                                        */
++/*                                                               */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #include <iostream>
+ #include "BHV_PModelView.h"
+diff --git a/ivp/src/lib_behaviors-marine/BHV_PModelView.h b/ivp/src/lib_behaviors-marine/BHV_PModelView.h
+index 72e0000c..439878bd 100644
+--- a/ivp/src/lib_behaviors-marine/BHV_PModelView.h
++++ b/ivp/src/lib_behaviors-marine/BHV_PModelView.h
+@@ -1,9 +1,25 @@
+-/***********************************************************/
+-/*    NAME: Michael Benjamin                               */
+-/*    ORGN: Dept of Mechanical Eng, MIT Cambridge MA       */
+-/*    FILE: BHV_PModelView.h                               */
+-/*    DATE: Nov 3rd, 2023                                  */
+-/***********************************************************/
++/*****************************************************************/
++/*    NAME: Michael Benjamin                                     */
++/*    ORGN: Dept of Mechanical Engineering, MIT, Cambridge MA    */
++/*    FILE: BHV_PModelView.h                                     */
++/*    DATE: Nov 3rd, 2023                                        */
++/*                                                               */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+  
+ #ifndef BHV_PMODEL_VIEW_HEADER
+ #define BHV_PMODEL_VIEW_HEADER
+diff --git a/ivp/src/lib_bhvutil/FixedTurn.cpp b/ivp/src/lib_bhvutil/FixedTurn.cpp
+index a9554f4d..d64927ea 100644
+--- a/ivp/src/lib_bhvutil/FixedTurn.cpp
++++ b/ivp/src/lib_bhvutil/FixedTurn.cpp
+@@ -4,20 +4,22 @@
+ /*    FILE: FixedTurn.cpp                                        */
+ /*    DATE: Jan 1st 2023                                         */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_bhvutil/FixedTurn.h b/ivp/src/lib_bhvutil/FixedTurn.h
+index b11672b9..7a9b5fdf 100644
+--- a/ivp/src/lib_bhvutil/FixedTurn.h
++++ b/ivp/src/lib_bhvutil/FixedTurn.h
+@@ -4,20 +4,22 @@
+ /*    FILE: FixedTurn.h                                          */
+ /*    DATE: Jan 1st 2023                                         */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_bhvutil/FixedTurnSet.cpp b/ivp/src/lib_bhvutil/FixedTurnSet.cpp
+index fe83aacf..47051f01 100644
+--- a/ivp/src/lib_bhvutil/FixedTurnSet.cpp
++++ b/ivp/src/lib_bhvutil/FixedTurnSet.cpp
+@@ -4,20 +4,22 @@
+ /*    FILE: FixedTurnSet.cpp                                     */
+ /*    DATE: Jan 2nd 2023                                         */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_bhvutil/FixedTurnSet.h b/ivp/src/lib_bhvutil/FixedTurnSet.h
+index 95422a4c..fa409997 100644
+--- a/ivp/src/lib_bhvutil/FixedTurnSet.h
++++ b/ivp/src/lib_bhvutil/FixedTurnSet.h
+@@ -4,20 +4,22 @@
+ /*    FILE: FixedTurnSet.h                                       */
+ /*    DATE: Jan 2nd 2023                                         */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_bhvutil/LegRun.cpp b/ivp/src/lib_bhvutil/LegRun.cpp
+index 791c69d5..7b034851 100644
+--- a/ivp/src/lib_bhvutil/LegRun.cpp
++++ b/ivp/src/lib_bhvutil/LegRun.cpp
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: LegRun.cpp                                      */
+ /*    DATE: May 26th, 2023                                  */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #include <iterator>
+ #include "GeomUtils.h"
+diff --git a/ivp/src/lib_bhvutil/LegRun.h b/ivp/src/lib_bhvutil/LegRun.h
+index 26b00291..a047f959 100644
+--- a/ivp/src/lib_bhvutil/LegRun.h
++++ b/ivp/src/lib_bhvutil/LegRun.h
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: LegRun.h                                        */
+ /*    DATE: May 26th, 2023                                  */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #ifndef LEG_RUN_OBJ_HEADER
+ #define LEG_RUN_OBJ_HEADER
+diff --git a/ivp/src/lib_bhvutil/LegRunSet.cpp b/ivp/src/lib_bhvutil/LegRunSet.cpp
+index 138e03e2..b0972845 100644
+--- a/ivp/src/lib_bhvutil/LegRunSet.cpp
++++ b/ivp/src/lib_bhvutil/LegRunSet.cpp
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: LegRunSet.cpp                                   */
+ /*    DATE: June 11th, 2023                                 */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #include <iterator>
+ #include "GeomUtils.h"
+diff --git a/ivp/src/lib_bhvutil/LegRunSet.h b/ivp/src/lib_bhvutil/LegRunSet.h
+index b9b98a0b..0d930945 100644
+--- a/ivp/src/lib_bhvutil/LegRunSet.h
++++ b/ivp/src/lib_bhvutil/LegRunSet.h
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: LegRunSet.h                                     */
+ /*    DATE: June 11th, 2023                                 */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #ifndef LEG_RUN_SET_HEADER
+ #define LEG_RUN_SET_HEADER
+diff --git a/ivp/src/lib_dep_behaviors/BHV_FixTurn.cpp b/ivp/src/lib_dep_behaviors/BHV_FixTurn.cpp
+index 0b331d82..1250eb2a 100644
+--- a/ivp/src/lib_dep_behaviors/BHV_FixTurn.cpp
++++ b/ivp/src/lib_dep_behaviors/BHV_FixTurn.cpp
+@@ -4,9 +4,21 @@
+ /*    FILE: BHV_FixTurn.cpp                                      */
+ /*    DATE: Oct 16th 2022                                        */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #include <cmath>
+diff --git a/ivp/src/lib_dep_behaviors/BHV_FixTurn.h b/ivp/src/lib_dep_behaviors/BHV_FixTurn.h
+index cd84fec1..f19bc084 100644
+--- a/ivp/src/lib_dep_behaviors/BHV_FixTurn.h
++++ b/ivp/src/lib_dep_behaviors/BHV_FixTurn.h
+@@ -4,9 +4,21 @@
+ /*    FILE: BHV_FixTurn.h                                        */
+ /*    DATE: Oct 16th 2022                                        */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #ifndef BHV_FIX_TURN_HEADER
+diff --git a/ivp/src/lib_geometry/OpField.cpp b/ivp/src/lib_geometry/OpField.cpp
+index ed64b50c..a2ba881a 100644
+--- a/ivp/src/lib_geometry/OpField.cpp
++++ b/ivp/src/lib_geometry/OpField.cpp
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: OpField.cpp                                     */
+ /*    DATE: September 25th, 2023                            */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #include <iterator>
+ #include "MBUtils.h"
+diff --git a/ivp/src/lib_geometry/OpField.h b/ivp/src/lib_geometry/OpField.h
+index 18fd2a2c..797d7609 100644
+--- a/ivp/src/lib_geometry/OpField.h
++++ b/ivp/src/lib_geometry/OpField.h
+@@ -1,9 +1,27 @@
+-/************************************************************/
++/*****************************************************************/
+ /*    NAME: Mike Benjamin                                   */
+ /*    ORGN: MIT, Cambridge MA                               */
+ /*    FILE: OpField.h                                       */
+ /*    DATE: Sep 25th, 2023                                  */
+-/************************************************************/
++/*                                                               */
++/* This file is part of IvP Helm Core Libs                       */
++/*                                                               */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
++/*                                                               */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
++/*                                                               */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
++/* <http://www.gnu.org/licenses/>.                               */
++/*****************************************************************/
+ 
+ #ifndef OP_FIELD_HEADER
+ #define OP_FIELD_HEADER
+diff --git a/ivp/src/lib_geometry/Populator_OpField.cpp b/ivp/src/lib_geometry/Populator_OpField.cpp
+index c6d4ddaa..ff558737 100644
+--- a/ivp/src/lib_geometry/Populator_OpField.cpp
++++ b/ivp/src/lib_geometry/Populator_OpField.cpp
+@@ -4,20 +4,22 @@
+ /*    FILE: Populator_OpField.cpp                                */
+ /*    DATE: Nov 23rd, 2023                                       */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_geometry/Populator_OpField.h b/ivp/src/lib_geometry/Populator_OpField.h
+index 47d09d8d..034380b8 100644
+--- a/ivp/src/lib_geometry/Populator_OpField.h
++++ b/ivp/src/lib_geometry/Populator_OpField.h
+@@ -1,23 +1,25 @@
+ /*****************************************************************/
+ /*    NAME: Michael Benjamin                                     */
+ /*    ORGN: Dept of Mechanical Eng / MIT Cambridge MA            */
+-/*    FILE: Populator_TaskDiary.h                                */
++/*    FILE: Populator_OpField.h                                  */
+ /*    DATE: Nov 23rd, 2023                                       */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+diff --git a/ivp/src/lib_helmivp/PMGen.cpp b/ivp/src/lib_helmivp/PMGen.cpp
+index e8c5b5bc..d5ca472e 100644
+--- a/ivp/src/lib_helmivp/PMGen.cpp
++++ b/ivp/src/lib_helmivp/PMGen.cpp
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen.cpp                                            */
+ /*    DATE: Jan 1st, 2024                                        */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #include "AngleUtils.h"
+diff --git a/ivp/src/lib_helmivp/PMGen.h b/ivp/src/lib_helmivp/PMGen.h
+index 99a4a659..4b3db1a9 100644
+--- a/ivp/src/lib_helmivp/PMGen.h
++++ b/ivp/src/lib_helmivp/PMGen.h
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen.h                                              */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #ifndef PMGEN_HEADER
+diff --git a/ivp/src/lib_helmivp/PMGen_Dubins.cpp b/ivp/src/lib_helmivp/PMGen_Dubins.cpp
+index 946bb04c..253900c8 100644
+--- a/ivp/src/lib_helmivp/PMGen_Dubins.cpp
++++ b/ivp/src/lib_helmivp/PMGen_Dubins.cpp
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen_Dubins.cpp                                     */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #include "PMGen_Dubins.h"
+diff --git a/ivp/src/lib_helmivp/PMGen_Dubins.h b/ivp/src/lib_helmivp/PMGen_Dubins.h
+index 5a47994e..da047f99 100644
+--- a/ivp/src/lib_helmivp/PMGen_Dubins.h
++++ b/ivp/src/lib_helmivp/PMGen_Dubins.h
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen_Dubins.h                                       */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #ifndef PMGEN_DUBINS_HEADER
+diff --git a/ivp/src/lib_helmivp/PMGen_Holonomic.cpp b/ivp/src/lib_helmivp/PMGen_Holonomic.cpp
+index 89da9109..6c8865d4 100644
+--- a/ivp/src/lib_helmivp/PMGen_Holonomic.cpp
++++ b/ivp/src/lib_helmivp/PMGen_Holonomic.cpp
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen_Holonomic.cpp                                  */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #include "MBUtils.h"
+diff --git a/ivp/src/lib_helmivp/PMGen_Holonomic.h b/ivp/src/lib_helmivp/PMGen_Holonomic.h
+index cb3a66f1..4def1d8c 100644
+--- a/ivp/src/lib_helmivp/PMGen_Holonomic.h
++++ b/ivp/src/lib_helmivp/PMGen_Holonomic.h
+@@ -4,9 +4,21 @@
+ /*    FILE: PMGen_Holonomic.h                                    */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #ifndef PMGEN_HOLONOMIC_HEADER
+diff --git a/ivp/src/lib_helmivp/PlatModelGenerator.cpp b/ivp/src/lib_helmivp/PlatModelGenerator.cpp
+index 9ecf808c..10ded423 100644
+--- a/ivp/src/lib_helmivp/PlatModelGenerator.cpp
++++ b/ivp/src/lib_helmivp/PlatModelGenerator.cpp
+@@ -4,9 +4,21 @@
+ /*    FILE: PlatModelGenerator.cpp                               */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #include "MBUtils.h"
+diff --git a/ivp/src/lib_helmivp/PlatModelGenerator.h b/ivp/src/lib_helmivp/PlatModelGenerator.h
+index 6b106451..9f487e32 100644
+--- a/ivp/src/lib_helmivp/PlatModelGenerator.h
++++ b/ivp/src/lib_helmivp/PlatModelGenerator.h
+@@ -4,9 +4,21 @@
+ /*    FILE: PlatModelGenerator.h                                 */
+ /*    DATE: Oct 24th, 2023                                       */
+ /*                                                               */
+-/* This is unreleased BETA code. No permission is granted or     */
+-/* implied to use, copy, modify, and distribute this software    */
+-/* except by the author(s), or those designated by the author.   */
++/* This file is part of MOOS-IvP                                 */
++/*                                                               */
++/* MOOS-IvP is free software: you can redistribute it and/or     */
++/* modify it under the terms of the GNU General Public License   */
++/* as published by the Free Software Foundation, either version  */
++/* 3 of the License, or (at your option) any later version.      */
++/*                                                               */
++/* MOOS-IvP is distributed in the hope that it will be useful,   */
++/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
++/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
++/* the GNU General Public License for more details.              */
++/*                                                               */
++/* You should have received a copy of the GNU General Public     */
++/* License along with MOOS-IvP.  If not, see                     */
++/* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 
+ #ifndef PLAT_MODEL_GENERATOR_HEADER
+diff --git a/ivp/src/lib_marineview/glext.h b/ivp/src/lib_marineview/glext.h
+index 07d18102..95017a48 100644
+--- a/ivp/src/lib_marineview/glext.h
++++ b/ivp/src/lib_marineview/glext.h
+@@ -1,10 +1,14 @@
+ /*****************************************************************/
+ /*    NAME: Michael Benjamin                                     */
+ /*    ORGN: Dept of Mechanical Engineering, MIT, Cambridge MA    */
+-/*    FILE:                                                      */
++/*    FILE: glext.h                                              */
+ /*    DATE:                                                      */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* MOOS-IvP provides only this comment block and the include     */
++/* guard below under GPLv3. From the Khronos Group copyright     */
++/* notice onward, this file contains third-party Materials       */
++/* licensed solely under the permissive Khronos terms shown    */
++/* there, not under GPLv3.                                       */
+ /*                                                               */
+ /* MOOS-IvP is free software: you can redistribute it and/or     */
+ /* modify it under the terms of the GNU General Public License   */
+diff --git a/ivp/src/lib_mbutil/VQuals.cpp b/ivp/src/lib_mbutil/VQuals.cpp
+index 3e624597..34eb1db1 100644
+--- a/ivp/src/lib_mbutil/VQuals.cpp
++++ b/ivp/src/lib_mbutil/VQuals.cpp
+@@ -4,20 +4,22 @@
+ /*    FILE: VQuals.cpp                                           */
+ /*    DATE: Mar 9th, 2024                                        */
+ /*                                                               */
+-/* This file is part of MOOS-IvP                                 */
++/* This file is part of IvP Helm Core Libs                       */
+ /*                                                               */
+-/* MOOS-IvP is free software: you can redistribute it and/or     */
+-/* modify it under the terms of the GNU General Public License   */
+-/* as published by the Free Software Foundation, either version  */
+-/* 3 of the License, or (at your option) any later version.      */
++/* IvP Helm Core Libs is free software: you can redistribute it  */
++/* and/or modify it under the terms of the Lesser GNU General    */
++/* Public License as published by the Free Software Foundation,  */
++/* either version 3 of the License, or (at your option) any      */
++/* later version.                                                */
+ /*                                                               */
+-/* MOOS-IvP is distributed in the hope that it will be useful,   */
+-/* but WITHOUT ANY WARRANTY; without even the implied warranty   */
+-/* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See  */
+-/* the GNU General Public License for more details.              */
++/* IvP Helm Core Libs is distributed in the hope that it will    */
++/* be useful but WITHOUT ANY WARRANTY; without even the implied  */
++/* warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR       */
++/* PURPOSE. See the Lesser GNU General Public License for more   */
++/* details.                                                      */
+ /*                                                               */
+-/* You should have received a copy of the GNU General Public     */
+-/* License along with MOOS-IvP.  If not, see                     */
++/* You should have received a copy of the Lesser GNU General     */
++/* Public License along with MOOS-IvP.  If not, see              */
+ /* <http://www.gnu.org/licenses/>.                               */
+ /*****************************************************************/
+ 

@@ -1,3 +1,34 @@
+moos-ivp (24.8.1+dfsg-4) trixie; urgency=high
+
+  * Security fixes from upstream's main branch, as patches:
+    - alogsplit: create the split directory without a shell, and reduce a
+      log variable name to a safe file name (CVE-2026-85439, CVE-2026-85456).
+    - iSay, uMemWatch: run commands without a shell (CVE-2026-85425,
+      CVE-2026-85426).
+    - uFldShoreBroker: refuse a ping whose keyword doesn't match, and bound
+      how many nodes may enrol (CVE-2026-85434, CVE-2026-85448).
+    - uFldNodeBroker: make runtime shore routes opt in (CVE-2026-85435).
+    - uFldNodeComms: bind a node message to the community it came from, and
+      bound how many nodes are tracked (CVE-2026-85429, CVE-2026-85446).
+      Missions where pMarineViewer posts NODE_MESSAGEs for vehicles need
+      BIND_MSG_SRC_TO_COMMUNITY = false.
+    - IvP function decoders: bound the BHV_IPF copies and scans, validate the
+      counts a payload declares, and bound the mux header (CVE-2026-85437,
+      CVE-2026-85438, CVE-2026-85445).
+    - isQuoted(), isBraced(), isChevroned(): index the stripped string with
+      its own length (CVE-2026-85444).
+    - Bound the .ipf file parser, free the StringToIvPContext buffer, and
+      re-check for an empty string in setVarDataPairOnString().
+  * pRealm: bound REALMCAST_REQ subscriptions, from upstream pull request
+    #132, not yet merged (CVE-2026-85447).
+  * pMarineViewer: bound how many distinct vehicles are tracked, with a new
+    MAX_NODE_COUNT (default 200). Upstream has no fix yet (CVE-2026-85449).
+  * Relicence the PMGen, PlatModelGenerator, VelocityFilter and BHV_FixTurn
+    files, whose headers withheld permission to distribute, as upstream did
+    in 90d6607.
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 14:00:00 +1100
+
 moos-ivp (24.8.1+dfsg-3) trixie; urgency=medium
 
   * Stop shipping the IvP and MOOSGeodesy headers in libmoos10-mit-dev,

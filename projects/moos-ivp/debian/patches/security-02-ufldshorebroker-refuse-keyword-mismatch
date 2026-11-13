@@ -1,0 +1,32 @@
+Description: uFldShoreBroker: refuse a ping whose keyword does not match
+ Applied to 24.8.1's handleMailNodePing(), whose time-warp check has no run warning.
+Origin: backport, https://github.com/moos-ivp/moos-ivp/commit/275e6993bab098bff43bffbab09def33cdab9440
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/275e6993bab098bff43bffbab09def33cdab9440
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85434
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/uFldShoreBroker/ShoreBroker.cpp b/ivp/src/uFldShoreBroker/ShoreBroker.cpp
+index 5fc03870..6a76aea7 100644
+--- a/ivp/src/uFldShoreBroker/ShoreBroker.cpp
++++ b/ivp/src/uFldShoreBroker/ShoreBroker.cpp
+@@ -363,8 +363,19 @@ void ShoreBroker::handleMailNodePing(const string& info)
+   if(m_time_warp_str != hrecord.getTimeWarp()) 
+     status = "timewarp (" + m_time_warp_str + "!=" + hrecord.getTimeWarp() + ")";
+   
+-  if((m_keyword != "") && (m_keyword != hrecord.getKeyword()))
++  if((m_keyword != "") && (m_keyword != hrecord.getKeyword())) {
++    // A ping carries the pShare input routes this broker will be told to
++    // send to, so enrolling a node whose keyword does not match means
++    // bridging mission traffic to an address chosen by the sender.  When a
++    // keyword is configured, a mismatch is a refusal, not a status string.
+     status = "keyword_mismatch";
++    hrecord.setStatus(status);
++    reportRunWarning("Refused NODE_BROKER_PING from " +
++		     hrecord.getCommunity() + ": " + status);
++    reportEvent("Refused ping from " + hrecord.getCommunity() +
++		" (keyword mismatch)");
++    return;
++  }
+   hrecord.setStatus(status);
+ 
+   string ping_time = hrecord.getTimeStamp();
