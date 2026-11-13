@@ -16,7 +16,6 @@ targets:
 
 build_depends:
   projects: [openocean-messages, moos-ivp-helm, goby3]
-  repositories: [zenoh]
 
 install_test:
   packages: [binutils]
