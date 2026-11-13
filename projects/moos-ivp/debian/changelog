@@ -23,6 +23,9 @@ moos-ivp (24.8.1+dfsg-4) trixie; urgency=high
     #132, not yet merged (CVE-2026-85447).
   * pMarineViewer: bound how many distinct vehicles are tracked, with a new
     MAX_NODE_COUNT (default 200). Upstream has no fix yet (CVE-2026-85449).
+  * Relicence the PMGen, PlatModelGenerator, VelocityFilter and BHV_FixTurn
+    files, whose headers withheld permission to distribute, as upstream did
+    in 90d6607.
 
  -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 14:00:00 +1100
 

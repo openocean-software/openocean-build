@@ -12,20 +12,14 @@ Files-Excluded: MOOS_Jul2724/proj-5.2.0/*
 # This needs attention before this could go to the Debian
 # archive:
 #
-# 1. UNRESOLVED NON-FREE FILES. The following files carry an explicit
-#    proprietary/all-rights-reserved header ("This is unreleased BETA
-#    code. No permission is granted or implied to use, copy, modify,
-#    and distribute this software except by the author(s)..."),
-#    which directly contradicts the GPLv3/LGPLv3 claim in COPYING.md:
-#      ivp/src/lib_helmivp/PMGen_Holonomic.{cpp,h}
-#      ivp/src/lib_helmivp/PMGen_Dubins.{cpp,h}
-#      ivp/src/lib_helmivp/PMGen.{cpp,h}
-#      ivp/src/lib_helmivp/PlatModelGenerator.{cpp,h}
-#      ivp/src/lib_behaviors-colregs/VelocityFilter.{cpp,h}
-#      ivp/src/lib_survey/SurveyGenerator.h
-#      ivp/src/lib_dep_behaviors/BHV_FixTurn.{cpp,h}
-#    These are NOT DFSG-free as written and must not be included in a
-#    Debian upload as-is.
+# 1. BETA-LICENSED FILES. 24.8.1's PMGen*, PlatModelGenerator,
+#    VelocityFilter and BHV_FixTurn carry an "unreleased BETA code. No
+#    permission is granted or implied to use, copy, modify, and
+#    distribute" header. Upstream relicensed them under (L)GPL-3+ in
+#    https://github.com/moos-ivp/moos-ivp/commit/90d6607e75f1d66340b8dc304f17013748f7a751
+#    and debian/patches/license-01-upstream-relicensing backports that.
+#    ivp/src/app_zaic_spd/{attic,unused}/* still carry the BETA header;
+#    they are in the source but not built.
 #
 # 2. FLTKCheckList.{cpp,h} and MOOSFLTKUI.h in the same libFLTKVW
 #    directory carry NO copyright or license notice at all. These appear to
