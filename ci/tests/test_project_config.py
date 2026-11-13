@@ -87,9 +87,9 @@ class ProjectConfigTest(ProjectFixture):
         config = self.load(self.project("p", """
             source: uscan
             install_test:
-              commands: [true]
+              commands: ["true"]
             """))
-        self.assertEqual(config["install_test"]["commands"], [True])
+        self.assertEqual(config["install_test"]["commands"], ["true"])
         # Sibling keys the project didn't set are kept
         self.assertEqual(config["install_test"]["target"]["dist"], "resolute")
         self.assertEqual(config["channels"]["release"]["prefix"], "release/")
@@ -122,6 +122,16 @@ class ProjectConfigTest(ProjectFixture):
             """))
         self.assertEqual([(t["dist"], t["arch"]) for t in project_config.matrix(config)],
                          [("resolute", "amd64")])
+
+    def test_install_test_commands_must_be_strings(self):
+        # An unquoted "grep 'a: b'" is a YAML mapping, not a command
+        with self.assertRaisesRegex(project_config.ConfigError, "must be a string"):
+            self.load(self.project("p", "source: uscan\ninstall_test:\n  commands:\n    - grep -F 'Usage: x'\n"))
+
+    def test_arch_all_must_be_a_built_arch(self):
+        self.load(self.project("p", "source: uscan\ntargets:\n  arch_all: amd64\n"))
+        with self.assertRaisesRegex(project_config.ConfigError, "targets.arch_all armhf isn't one of targets.arch"):
+            self.load(self.project("p", "source: uscan\ntargets:\n  arch_all: armhf\n"))
 
     def test_install_test_target_must_be_built(self):
         with self.assertRaisesRegex(project_config.ConfigError, "install_test.target"):
@@ -327,6 +337,17 @@ class ProjectConfigTest(ProjectFixture):
         self.assertEqual(written.returncode, 0)
         self.assertEqual((self.root / "pref" / "ext.pref").read_text(),
                          "Package: libext libext-dev\nPin: version 1.2.3\nPin-Priority: 1001\n")
+
+    def test_resolve_alternatives_is_set_in_sbuild_conf_only_when_asked(self):
+        out = self.root / "out"
+        project_config.write_sources([], out, root=self.root)
+        self.assertNotIn("resolve_alternatives", (out / "sbuild.conf").read_text())
+        project_config.write_sources([], out, root=self.root, resolve_alternatives=True)
+        # sbuild evaluates its configuration as Perl, with its settings already declared
+        perl = 'my $resolve_alternatives = 0; my $extra_repositories; my $extra_repository_keys; ' \
+               'my $e = eval `cat "$ARGV[0]"`; die $@ unless defined $e; print $resolve_alternatives'
+        result = subprocess.run(["perl", "-e", perl, str(out / "sbuild.conf")], check=True, capture_output=True, text=True)
+        self.assertEqual(result.stdout, "1")
 
     def test_every_real_project_loads(self):
         for name in project_config.list_projects():

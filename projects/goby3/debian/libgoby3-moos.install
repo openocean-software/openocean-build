@@ -1,0 +1,3 @@
+usr/lib/*/libgoby_moos.so.*
+usr/lib/*/libgoby_*_moos_gateway_plugin.so.*
+

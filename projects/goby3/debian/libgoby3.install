@@ -1,0 +1,4 @@
+usr/lib/*/libgoby.so.*
+usr/lib/*/libgoby_zeromq.so.*
+usr/lib/*/libgoby_liaison_core.so.*
+usr/lib/*/libgoby_frontseat_*.so.*
