@@ -11,6 +11,7 @@ import importlib.util
 import json
 import subprocess
 import unittest
+import urllib.error
 import urllib.parse
 from pathlib import Path
 
@@ -57,6 +58,74 @@ def resolve(refs):
     def lookup(url, ref):
         return refs[(url, ref)]
     return lookup
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.status = 200
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return json.dumps(self.body).encode()
+
+
+def http_error(code):
+    return urllib.error.HTTPError("https://example.org", code, "error", {}, None)
+
+
+class HttpRetryTest(unittest.TestCase):
+    """http() retries what NVD's API does when it's struggling (503s, timeouts),
+    sleeping with backoff between attempts, but not errors that won't go away."""
+
+    def run_http(self, outcomes, method="GET", url=scan.NVD_API):
+        """Each outcome is an exception to raise, or a body to answer with."""
+        calls, sleeps = [], []
+
+        def urlopen(request, timeout):
+            calls.append(request.full_url)
+            outcome = outcomes[len(calls) - 1]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return FakeResponse(outcome)
+
+        result = scan.http(method, url, urlopen=urlopen, sleep=sleeps.append)
+        return result, calls, sleeps
+
+    def test_server_errors_and_timeouts_are_retried_with_backoff(self):
+        result, calls, sleeps = self.run_http([http_error(503), TimeoutError("timed out"), {"ok": True}])
+        self.assertEqual(result, (200, {"ok": True}))
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(sleeps, [5, 10])
+
+    def test_rate_limit_and_dropped_connection_are_retried(self):
+        result, calls, _ = self.run_http([http_error(429), urllib.error.URLError("reset"), {"ok": True}])
+        self.assertEqual(result, (200, {"ok": True}))
+        self.assertEqual(len(calls), 3)
+
+    def test_gives_up_after_the_last_attempt(self):
+        with self.assertRaises(urllib.error.HTTPError):
+            self.run_http([http_error(503)] * 4)
+
+    def test_other_client_errors_are_not_retried(self):
+        with self.assertRaises(urllib.error.HTTPError):
+            self.run_http([http_error(403), {"ok": True}])
+
+    def test_not_found_is_a_result(self):
+        result, calls, _ = self.run_http([http_error(404)])
+        self.assertEqual(result, (404, None))
+        self.assertEqual(len(calls), 1)
+
+    def test_a_github_post_is_not_retried(self):
+        # A POST that failed may still have created the issue
+        with self.assertRaises(urllib.error.HTTPError):
+            self.run_http([http_error(502), {"ok": True}], method="POST",
+                          url=f"{scan.GITHUB_API}/repos/o/r/issues")
 
 
 class SourcesTest(unittest.TestCase):
