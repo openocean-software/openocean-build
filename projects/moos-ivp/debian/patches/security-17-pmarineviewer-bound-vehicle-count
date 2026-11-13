@@ -1,0 +1,70 @@
+Description: pMarineViewer: bound how many distinct vehicles may be tracked
+ CVE-2026-85449: every distinct NAME in a NODE_REPORT adds a vehicle to
+ the VehicleSet, which keeps it, so a publisher can exhaust memory with
+ made-up names. Upstream has no fix yet; this follows its fixes for
+ uFldNodeComms (#131) and uFldShoreBroker (#133): refuse a new name
+ once max_node_count (default 200) are tracked.
+Author: Toby Schneider <toby@gobysoft.org>
+Forwarded: no
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85449
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_marineview/VehicleSet.cpp b/ivp/src/lib_marineview/VehicleSet.cpp
+index 34eab581..01db916b 100644
+--- a/ivp/src/lib_marineview/VehicleSet.cpp
++++ b/ivp/src/lib_marineview/VehicleSet.cpp
+@@ -40,6 +40,7 @@ VehicleSet::VehicleSet()
+ {
+   m_curr_time    = 0;
+   m_history_size = 1000;
++  m_max_node_count = 200;
+ 
+   m_xmin = 0;
+   m_xmax = 0;
+@@ -70,6 +71,12 @@ bool VehicleSet::setParam(string param, string value)
+       m_vehicles_active_name = value;
+     }
+   }
++  else if(param == "max_node_count") {
++    if(isNumber(value) && (atoi(value.c_str()) > 0)) {
++      m_max_node_count = (unsigned int)(atoi(value.c_str()));
++      handled = true;
++    }
++  }
+   else if((param == "center_vehicle_name") || 
+ 	  (param == "vehicles_center_name")) {
+     m_vehicles_center_name = value;
+@@ -518,9 +525,18 @@ bool VehicleSet::handleNodeReport(double local_time,
+     return(false);
+   }
+ 
++  // A report for a name we have not seen before adds a vehicle, which is then
++  // kept and drawn for good.  The name is chosen by whoever published the
++  // report, so refuse a new one once the ceiling is reached.  Reports for
++  // vehicles we already track still go through.
++  string vname = new_record.getName();
++  if((m_rec_map.count(vname) == 0) && (m_rec_map.size() >= m_max_node_count)) {
++    whynot = "max_node_count (" + uintToString(m_max_node_count) + ") reached";
++    return(false);
++  }
++
+   // If there is no active vehicle declared - make the active vehicle
+   // the first one that the VehicleSet knows about.
+-  string vname = new_record.getName();
+   if(m_vehicles_active_name == "")
+     m_vehicles_active_name = vname;
+   
+diff --git a/ivp/src/lib_marineview/VehicleSet.h b/ivp/src/lib_marineview/VehicleSet.h
+index d3b763e3..cb7531c0 100644
+--- a/ivp/src/lib_marineview/VehicleSet.h
++++ b/ivp/src/lib_marineview/VehicleSet.h
+@@ -107,6 +107,9 @@ class VehicleSet
+   std::string m_vehicles_center_name;
+ 
+   unsigned int m_history_size;
++
++  // Ceiling on how many distinct vehicles may be tracked
++  unsigned int m_max_node_count;
+   double       m_curr_time;
+ 
+   double  m_xmin;

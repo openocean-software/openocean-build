@@ -1,0 +1,29 @@
+Description: setVarDataPairOnString: re-check for an empty string after biting it
+Origin: upstream, https://github.com/moos-ivp/moos-ivp/commit/651bc2f944be37691da7c604a230a8281684c9f8
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/651bc2f944be37691da7c604a230a8281684c9f8
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_mbutil/VarDataPairUtils.cpp b/ivp/src/lib_mbutil/VarDataPairUtils.cpp
+index 5ccf84eb..c1d42407 100644
+--- a/ivp/src/lib_mbutil/VarDataPairUtils.cpp
++++ b/ivp/src/lib_mbutil/VarDataPairUtils.cpp
+@@ -57,11 +57,19 @@ bool setVarDataPairOnString(VarDataPair& pair, string str)
+   if((str.at(0) == '@') || (str.at(0) == '<') || (str.at(0) == '>'))
+     post_tag = tolower(biteStringX(str, ' '));
+ 
++  // The string had no separator and was bitten
++  if(str == "")
++    return(false);
++
+   // Part 3: Check for Destination tag
+   string dest_tag;
+   if(str.at(0) == '#') {
+     biteStringX(str, '#');
+     dest_tag = tolower(biteStringX(str, ' '));
++
++    // as above
++    if(str == "")
++      return(false);
+   }
+   
+   // Part 4: Check for conditional

@@ -1,0 +1,37 @@
+Description: Index the stripped string with its own length in isBraced and friends
+Origin: upstream, https://github.com/moos-ivp/moos-ivp/commit/f2f8cbebb59b048b931f46a511b61df5388e079b
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/f2f8cbebb59b048b931f46a511b61df5388e079b
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85444
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_mbutil/MBUtils.cpp b/ivp/src/lib_mbutil/MBUtils.cpp
+index b01cebf1..f6a09b38 100644
+--- a/ivp/src/lib_mbutil/MBUtils.cpp
++++ b/ivp/src/lib_mbutil/MBUtils.cpp
+@@ -1660,7 +1660,7 @@ bool isQuoted(const string& str)
+   if(len < 2)
+     return(false);
+ 
+-  if((mod_str[0] == '"') && (mod_str[str.length()-1] == '"'))
++  if((mod_str[0] == '"') && (mod_str[len-1] == '"'))
+     return(true);
+   return(false);
+ }
+@@ -1677,7 +1677,7 @@ bool isBraced(const string& str)
+   if(len < 2)
+     return(false);
+ 
+-  if((mod_str[0] == '{') && (mod_str[str.length()-1] == '}'))
++  if((mod_str[0] == '{') && (mod_str[len-1] == '}'))
+     return(true);
+   return(false);
+ }
+@@ -1694,7 +1694,7 @@ bool isChevroned(const string& str)
+   if(len < 2)
+     return(false);
+   
+-  if((mod_str[0] == '<') && (mod_str[str.length()-1] == '>'))
++  if((mod_str[0] == '<') && (mod_str[len-1] == '>'))
+     return(true);
+   return(false);
+ }

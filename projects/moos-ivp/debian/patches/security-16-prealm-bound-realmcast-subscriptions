@@ -1,0 +1,164 @@
+Description: pRealm: bound REALMCAST_REQ subscriptions and reclaim expired pipeways
+ Everything in a REALMCAST_REQ is chosen by whoever published it, and
+ PipeWay::valid() only tests that the client is non-empty, the duration is
+ non-zero, and there is either a channel or one variable:
+   * the duration has no upper bound, so duration=1000000000 keeps a
+     pipeway alive for about 31 years
+   * the variable list is a ':' separated list with no length limit, and
+     every variable is rendered on every interval
+   * the client name is a map key, so one publisher can create as many
+     distinct pipeways as it likes
+ buildRealmCast() and buildWatchCast() serialise every live pipeway and
+ publish it on every interval. 500 requests with a 31 year duration take
+ pRealm from no measurable CPU to 1043 ticks and from 4.7 MB to 15 MB,
+ .
+ From upstream pull request #132, which is not merged yet: its four commits as one patch.
+Origin: backport, https://github.com/moos-ivp/moos-ivp/pull/132
+Forwarded: not-needed
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85447
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/pRealm/PipeWay.cpp b/ivp/src/pRealm/PipeWay.cpp
+index 48abdc1d..49058a93 100644
+--- a/ivp/src/pRealm/PipeWay.cpp
++++ b/ivp/src/pRealm/PipeWay.cpp
+@@ -115,6 +115,16 @@ bool PipeWay::valid() const
+   if(m_client == "")
+     return(false);
+ 
++  // The duration decides how long this pipeway keeps being serialised and
++  // published on every interval, and it comes from the request.
++  if((m_duration < 0) || (m_duration > MAX_PIPEWAY_DURATION))
++    return(false);
++
++  // The variable list is a ':' separated list in the request with no length
++  // of its own, and every variable is rendered every interval.
++  if(m_vars.size() > MAX_PIPEWAY_VARS)
++    return(false);
++
+   return(true);
+ }
+ 
+diff --git a/ivp/src/pRealm/PipeWay.h b/ivp/src/pRealm/PipeWay.h
+index 0389751e..bcfbceb7 100644
+--- a/ivp/src/pRealm/PipeWay.h
++++ b/ivp/src/pRealm/PipeWay.h
+@@ -28,6 +28,12 @@
+ #include <map>
+ #include <set>
+ 
++// Limits on what one REALMCAST_REQ may ask for.  Everything in the request is
++// chosen by whoever published it, and every live pipeway is serialised and
++// published on every interval, so none of it may be unbounded.
++#define MAX_PIPEWAY_DURATION 3600    // seconds
++#define MAX_PIPEWAY_VARS     64      // variables in one request
++
+ class PipeWay
+ {
+  public:
+diff --git a/ivp/src/pRealm/Realm.cpp b/ivp/src/pRealm/Realm.cpp
+index ffb3eaa1..77c49fe7 100644
+--- a/ivp/src/pRealm/Realm.cpp
++++ b/ivp/src/pRealm/Realm.cpp
+@@ -35,6 +35,7 @@ using namespace std;
+ 
+ Realm::Realm()
+ {
++  m_max_pipeways = 64;
+   // Init Config Variables
+   m_msg_max_hist = 10;
+ 
+@@ -289,6 +290,19 @@ void Realm::handleMailRealmCastReq(string sval)
+   string client = pipeway.getClient();
+ 
+   if(m_map_pipeways.count(client) == 0) {
++    // Preserve the expiration grace period while there is room, but reclaim
++    // inactive pipeways before refusing a new client at the ceiling.
++    if(m_map_pipeways.size() >= m_max_pipeways)
++      removeExpiredPipeways(false);
++
++    // Refuse new clients once we're at or past the max
++    // This protects us from rogue requests consuming too much CPU / memory
++    if(m_map_pipeways.size() >= m_max_pipeways) {
++      reportRunWarning("Refused RealmCastReq from " + client +
++		       ": max_pipeways (" + uintToString(m_max_pipeways) +
++		       ") reached");
++      return;
++    }
+     m_map_pipeways[client] = pipeway;
+   }
+   else {  
+@@ -347,11 +361,7 @@ void Realm::buildRealmCast()
+   if(elapsed < m_relcast_interval)
+     return;
+   
+-  // Part 2: Determine for each client if the pipeway has expired or
+-  // not. If not, then generate a realmcast for the channel associated
+-  // with that pipeway. If the pipeway has expired, make note of the
+-  // client key, and cleanup afterwards. 
+-  vector<string> expired_clients;
++  // Part 2: Generate casts for pipeways that have not expired.
+        
+   map<string, PipeWay>::iterator p;
+   for(p=m_map_pipeways.begin(); p!=m_map_pipeways.end(); p++) {
+@@ -373,15 +383,30 @@ void Realm::buildRealmCast()
+ 	m_last_post_relcast = m_curr_time;
+       }
+     }
+-    else if(time_until_expire < -30)
+-      expired_clients.push_back(client);
+   }
+ 
+-  // Part 3: For client pipeways that have indeed expired, remove
+-  // these entries from the map.
+-  for(unsigned int i=0; i<expired_clients.size(); i++) {
+-    string client = expired_clients[i];
+-    m_map_pipeways.erase(client);
++  // Part 3: Clean up expired pipeways after the grace period.
++  removeExpiredPipeways();
++}
++
++//---------------------------------------------------------
++// Procedure: removeExpiredPipeways()
++//   Purpose: Reclaim inactive pipeways, normally retaining the 30-second
++//            grace period. Admission at capacity skips the grace period.
++
++void Realm::removeExpiredPipeways(bool preserve_grace)
++{
++  map<string, PipeWay>::iterator p = m_map_pipeways.begin();
++  while(p != m_map_pipeways.end()) {
++    double time_until_expire = p->second.timeUntilExpire(m_curr_time);
++    bool expired = preserve_grace ? (time_until_expire < -30) :
++                                   (time_until_expire <= 0);
++    if(expired) {
++      map<string, PipeWay>::iterator old = p++;
++      m_map_pipeways.erase(old);
++    }
++    else
++      ++p;
+   }
+ }
+ 
+diff --git a/ivp/src/pRealm/Realm.h b/ivp/src/pRealm/Realm.h
+index 5b6b4797..fd567aea 100644
+--- a/ivp/src/pRealm/Realm.h
++++ b/ivp/src/pRealm/Realm.h
+@@ -51,6 +51,7 @@ class Realm : public AppCastingMOOSApp
+  protected: // Auxilliary functions
+ 
+   void buildRealmCast();
++  void removeExpiredPipeways(bool preserve_grace=true);
+   bool buildRealmCastChannel(PipeWay);
+   bool buildWatchCast(PipeWay);
+   void buildRealmCastSummary();
+@@ -116,6 +117,10 @@ class Realm : public AppCastingMOOSApp
+   // Key is the client, e.g., pmv, umview 
+   std::map<std::string, PipeWay> m_map_pipeways;
+ 
++  // Ceiling on how many distinct clients may hold a pipeway.  Each one is
++  // serialised and published on every interval.
++  unsigned int m_max_pipeways;
++
+   std::map<std::string, double> m_map_var_last_wcast;
+ 
+   std::string m_last_post_summary_info;

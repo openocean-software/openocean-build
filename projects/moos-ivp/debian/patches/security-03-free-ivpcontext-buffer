@@ -1,0 +1,18 @@
+Description: Free the context buffer in StringToIvPContext
+Origin: upstream, https://github.com/moos-ivp/moos-ivp/commit/aaeaddb04070286d8732c8655a8bee0bdb91d575
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/aaeaddb04070286d8732c8655a8bee0bdb91d575
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/lib_ivpbuild/FunctionEncoder.cpp b/ivp/src/lib_ivpbuild/FunctionEncoder.cpp
+index 865f721b..22cad364 100644
+--- a/ivp/src/lib_ivpbuild/FunctionEncoder.cpp
++++ b/ivp/src/lib_ivpbuild/FunctionEncoder.cpp
+@@ -525,6 +525,8 @@ string StringToIvPContext(const string& str)
+   cix++;
+ 
+   string rstring = cstr_buff;
++  delete [] cstr_buff;
++
+   return(rstring);
+ }
+ 

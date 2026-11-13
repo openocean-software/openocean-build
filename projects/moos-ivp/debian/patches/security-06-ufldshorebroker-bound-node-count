@@ -1,0 +1,65 @@
+Description: uFldShoreBroker: bound how many nodes may enrol
+ Applied to 24.8.1's handleMailNodePing(), at its new-node branch.
+Origin: backport, https://github.com/moos-ivp/moos-ivp/commit/d40a41371dae55a172b7d04319cbfd667153ff0a
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/d40a41371dae55a172b7d04319cbfd667153ff0a
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85448
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/uFldShoreBroker/ShoreBroker.cpp b/ivp/src/uFldShoreBroker/ShoreBroker.cpp
+index 6a76aea7..71bb5b3e 100644
+--- a/ivp/src/uFldShoreBroker/ShoreBroker.cpp
++++ b/ivp/src/uFldShoreBroker/ShoreBroker.cpp
+@@ -37,6 +37,7 @@ using namespace std;
+ 
+ ShoreBroker::ShoreBroker()
+ {
++  m_max_node_count   = 100;
+   // Initialize config variables
+   m_warning_on_stale = false;
+ 
+@@ -151,6 +152,12 @@ bool ShoreBroker::OnStartUp()
+       handleConfigQBridge(value);
+     else if(param == "keyword") 
+       m_keyword = value;
++    else if(param == "max_node_count") {
++      if(isNumber(value) && (atoi(value.c_str()) > 0))
++	m_max_node_count = (unsigned int)(atoi(value.c_str()));
++      else
++	handled = false;
++    }
+     else if(param == "auto_bridge_realmcast") 
+       handled = setBooleanOnString(auto_bridge_realmcast, value);
+     else if(param == "auto_bridge_appcast") 
+@@ -412,6 +419,15 @@ void ShoreBroker::handleMailNodePing(const string& info)
+     }
+   }
+ 
++  // Refuse to enrol a new community once the ceiling is reached.  Existing
++  // nodes above keep being updated; only growth is stopped.
++  if(m_node_host_records.size() >= m_max_node_count) {
++    reportRunWarning("Refused NODE_BROKER_PING from " +
++		     hrecord.getCommunity() + ": max_node_count (" +
++		     uintToString(m_max_node_count) + ") reached");
++    return;
++  }
++
+   // Part 5: Handle the new Node.
+   // Prepare to send this host and acknowldgement by posting a 
+   // request to pShare for a new variable bridging.
+diff --git a/ivp/src/uFldShoreBroker/ShoreBroker.h b/ivp/src/uFldShoreBroker/ShoreBroker.h
+index dc123d12..5d00959f 100644
+--- a/ivp/src/uFldShoreBroker/ShoreBroker.h
++++ b/ivp/src/uFldShoreBroker/ShoreBroker.h
+@@ -68,6 +68,12 @@ class ShoreBroker : public AppCastingMOOSApp
+ 
+   std::string m_keyword;
+ 
++  // Ceiling on how many distinct communities may be enrolled.  Each one adds
++  // an entry to six parallel vectors which are then walked every pass, and
++  // nothing ever removes an entry, so an unauthenticated sender can grow the
++  // work this app does per iteration without bound.
++  unsigned int m_max_node_count;
++
+   bool m_warning_on_stale;
+ 
+   std::set<std::string> m_set_qbridge_vars;

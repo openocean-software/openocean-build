@@ -1,0 +1,74 @@
+Description: uFldNodeComms: bound how many nodes may be tracked
+ Unique NODE_REPORT identities trigger quadratic uFldNodeComms work
+ .
+ 24.8.1's FldNodeComms keeps its node records in m_map_record rather than a ContactLedger, so the bound counts that map.
+Origin: backport, https://github.com/moos-ivp/moos-ivp/commit/3f0928a9712f802d020414e190ed21a1a028d34b
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/3f0928a9712f802d020414e190ed21a1a028d34b
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85446
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/src/uFldNodeComms/FldNodeComms.cpp b/ivp/src/uFldNodeComms/FldNodeComms.cpp
+index 5c1947b5..e2004937 100644
+--- a/ivp/src/uFldNodeComms/FldNodeComms.cpp
++++ b/ivp/src/uFldNodeComms/FldNodeComms.cpp
+@@ -38,6 +38,9 @@ using namespace std;
+ 
+ FldNodeComms::FldNodeComms()
+ {
++  // So we have an upper limit to both memory usage and all-pairs processing time.
++  m_max_node_count   = 200;
++
+   // A NODE_MESSAGE names the node it came from in its own body; require that
+   // to match the community the message arrived from.
+   m_bind_msg_src_to_community = true;
+@@ -260,6 +263,18 @@ bool FldNodeComms::OnStartUp()
+       handled = setNonNegDoubleOnString(m_min_msg_interval, value);
+     else if(param == "min_rpt_interval") 
+       handled = setNonNegDoubleOnString(m_min_rpt_interval, value);
++    else if(param == "max_node_count") {
++      // Every distinct NAME in a NODE_REPORT becomes a ledger entry, and
++      // distributeNodeReportInfo() walks the whole ledger for each new
++      // record, so the work per pass grows with the square of the number of
++      // asserted nodes.  Bound the ledger.
++      if(isNumber(value) && (atoi(value.c_str()) > 0)) {
++	m_max_node_count = (unsigned int)(atoi(value.c_str()));
++	handled = true;
++      }
++      else
++	handled = false;
++    }
+     else if(param == "bind_msg_src_to_community")
+       handled = setBooleanOnString(m_bind_msg_src_to_community, value);
+     else if(param == "max_msg_length")
+@@ -378,6 +393,17 @@ bool FldNodeComms::handleMailNodeReport(const string& str, string& whynot)
+   string upp_name = toupper(new_record.getName());
+   string grp_name = toupper(new_record.getGroup());
+ 
++  // A report for a name we have not seen before adds a node to the ledger,
++  // and distributeNodeReportInfo() then walks the whole ledger for it.  The
++  // name is chosen by whoever published the report, so refuse a new one once
++  // the ceiling is reached.  Reports for nodes we already track still go
++  // through, so an established field is unaffected.
++  if((m_map_record.count(upp_name) == 0) &&
++     (m_map_record.size() >= m_max_node_count)) {
++    whynot = "max_node_count (" + uintToString(m_max_node_count) + ") reached";
++    return(false);
++  }
++
+   if(m_ignore_group != "") {
+     if(toupper(m_ignore_group) == grp_name)
+       return(true);
+diff --git a/ivp/src/uFldNodeComms/FldNodeComms.h b/ivp/src/uFldNodeComms/FldNodeComms.h
+index eab49a54..a1ceba0b 100644
+--- a/ivp/src/uFldNodeComms/FldNodeComms.h
++++ b/ivp/src/uFldNodeComms/FldNodeComms.h
+@@ -128,6 +128,9 @@ class FldNodeComms : public AppCastingMOOSApp
+   // Holds last node report received for vehicle vname
+   std::map<std::string, NodeRecord>   m_map_record;     
+ 
++  // Ceiling on how many distinct nodes may occupy the ledger
++  unsigned int  m_max_node_count;
++  
+   // Must the src_node in a NODE_MESSAGE match the community the message
+   // actually came from?  A NODE_MESSAGE is relayed by the bridges, whose
+   // messages legitimately carry a foreign community, so this can be turned

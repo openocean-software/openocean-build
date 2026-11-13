@@ -1,0 +1,131 @@
+Description: uFldNodeComms: bind a node message to the community it came from
+ Applied to 24.8.1's FldNodeComms, which keeps its own map of node records instead of a ContactLedger.
+Origin: backport, https://github.com/moos-ivp/moos-ivp/commit/21cb051494158b072fc50ab3bc774e0787774587
+Applied-Upstream: https://github.com/moos-ivp/moos-ivp/commit/21cb051494158b072fc50ab3bc774e0787774587
+Bug: https://nvd.nist.gov/vuln/detail/CVE-2026-85429
+Last-Update: 2026-11-13
+---
+diff --git a/ivp/missions/u6_alpha/meta_shoreside.moos b/ivp/missions/u6_alpha/meta_shoreside.moos
+index 02d946ae..ee3d70b8 100644
+--- a/ivp/missions/u6_alpha/meta_shoreside.moos
++++ b/ivp/missions/u6_alpha/meta_shoreside.moos
+@@ -122,6 +122,9 @@ ProcessConfig = uFldNodeComms
+   MIN_MSG_INTERVAL = 20
+   MAX_MSG_LENGTH   = 10
+ 
++  // pMarineViewer publishes NODE_MESSAGEs on behalf of vehicles.
++  BIND_MSG_SRC_TO_COMMUNITY = false
++
+   GROUPS           = true
+ }
+ 
+diff --git a/ivp/missions/ufld_generic_sensor/meta_shoreside.moos b/ivp/missions/ufld_generic_sensor/meta_shoreside.moos
+index 6df62eb5..476f5fe4 100644
+--- a/ivp/missions/ufld_generic_sensor/meta_shoreside.moos
++++ b/ivp/missions/ufld_generic_sensor/meta_shoreside.moos
+@@ -58,6 +58,8 @@ ProcessConfig = uFldNodeComms
+         CRITICAL_RANGE = 25
+       MIN_MSG_INTERVAL = 20
+         MAX_MSG_LENGTH = 1000
++  // pMarineViewer publishes NODE_MESSAGEs on behalf of vehicles.
++  BIND_MSG_SRC_TO_COMMUNITY = false
+                 GROUPS = true
+   VIEW_NODE_RPT_PULSES = false
+ }
+diff --git a/ivp/src/uFldNodeComms/FldNodeComms.cpp b/ivp/src/uFldNodeComms/FldNodeComms.cpp
+index e1649279..5c1947b5 100644
+--- a/ivp/src/uFldNodeComms/FldNodeComms.cpp
++++ b/ivp/src/uFldNodeComms/FldNodeComms.cpp
+@@ -38,6 +38,11 @@ using namespace std;
+ 
+ FldNodeComms::FldNodeComms()
+ {
++  // A NODE_MESSAGE names the node it came from in its own body; require that
++  // to match the community the message arrived from.
++  m_bind_msg_src_to_community = true;
++  m_rejected_msg_source       = 0;
++
+   // The default range within which reports are sent between nodes
+   m_comms_range      = 100;
+ 
+@@ -114,7 +119,7 @@ bool FldNodeComms::OnNewMail(MOOSMSG_LIST &NewMail)
+     if((key == "NODE_REPORT") || (key == "NODE_REPORT_LOCAL")) 
+       handled = handleMailNodeReport(sval, whynot);
+     else if((key == "NODE_MESSAGE") || (key == "MEDIATED_MESSAGE"))
+-      handled = handleMailNodeMessage(sval, msrc);
++      handled = handleMailNodeMessage(sval, msrc, msg.GetCommunity());
+     else if(key == "ACK_MESSAGE") 
+       handled = handleMailAckMessage(sval);
+     else if(key == "UNC_SHARED_NODE_REPORTS") 
+@@ -255,6 +260,8 @@ bool FldNodeComms::OnStartUp()
+       handled = setNonNegDoubleOnString(m_min_msg_interval, value);
+     else if(param == "min_rpt_interval") 
+       handled = setNonNegDoubleOnString(m_min_rpt_interval, value);
++    else if(param == "bind_msg_src_to_community")
++      handled = setBooleanOnString(m_bind_msg_src_to_community, value);
+     else if(param == "max_msg_length")
+       handled = setUIntOnString(m_max_msg_length, value);
+     else if(param == "stealth") 
+@@ -400,7 +407,8 @@ bool FldNodeComms::handleMailNodeReport(const string& str, string& whynot)
+ //                           var_name=FOO, string_val=bar   
+ 
+ bool FldNodeComms::handleMailNodeMessage(const string& msg,
+-					 const string& msg_src)
++					 const string& msg_src,
++					 const string& msg_community)
+ {
+   NodeMessage new_message = string2NodeMessage(msg);
+   
+@@ -419,6 +427,13 @@ bool FldNodeComms::handleMailNodeMessage(const string& msg,
+   if(new_message.getSourceApp() == "")
+     new_message.setSourceApp(msg_src);
+ 
++  // Part 3b: Bind src_node to the MOOSDB community unless disabled.
++  if(m_bind_msg_src_to_community && (msg_community != "") &&
++     !MOOSStrCmp(new_message.getSourceNode(), msg_community)) {
++    m_rejected_msg_source++;
++    return(false);
++  }
++
+   // Part 4: 
+   string upp_src_node = toupper(new_message.getSourceNode());
+ 
+@@ -1298,6 +1313,9 @@ bool FldNodeComms::buildReport()
+   m_msgs << "======================================" << endl;
+ 
+   m_msgs << "    Total Msgs Received: " << m_total_messages_rcvd << endl;
++  if (m_bind_msg_src_to_community) {
++    m_msgs << "  Total Source-Rejected: " << m_rejected_msg_source << endl;
++  }
+   map<string, unsigned int>::iterator q;
+   for(q=m_map_messages_rcvd.begin(); q!=m_map_messages_rcvd.end(); q++) {
+     string vname = q->first;
+diff --git a/ivp/src/uFldNodeComms/FldNodeComms.h b/ivp/src/uFldNodeComms/FldNodeComms.h
+index 969c0dbc..eab49a54 100644
+--- a/ivp/src/uFldNodeComms/FldNodeComms.h
++++ b/ivp/src/uFldNodeComms/FldNodeComms.h
+@@ -50,7 +50,8 @@ class FldNodeComms : public AppCastingMOOSApp
+   void registerVariables();
+   void checkForDeletableNodes();
+   bool handleMailNodeReport(const std::string& str, std::string& whynot);
+-  bool handleMailNodeMessage(const std::string& str, const std::string& src);
++  bool handleMailNodeMessage(const std::string& str, const std::string& src,
++			     const std::string& community);
+   bool handleMailAckMessage(const std::string& str);
+   bool handleMailCommsRange(double);
+   bool handleMailFullReportReq(std::string);
+@@ -126,6 +127,14 @@ class FldNodeComms : public AppCastingMOOSApp
+  protected: // State variables
+   // Holds last node report received for vehicle vname
+   std::map<std::string, NodeRecord>   m_map_record;     
++
++  // Must the src_node in a NODE_MESSAGE match the community the message
++  // actually came from?  A NODE_MESSAGE is relayed by the bridges, whose
++  // messages legitimately carry a foreign community, so this can be turned
++  // off for a deployment which relies on that.
++  bool          m_bind_msg_src_to_community;
++  unsigned int  m_rejected_msg_source;
++  
+   // Holds last time posted local share, if enabled, for each vname
+   std::map<std::string, double>       m_map_lshare_tstamp;     
+   // Holds last node messsages received for vehicle vname
