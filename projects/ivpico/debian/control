@@ -1,0 +1,32 @@
+Source: ivpico
+Section: science
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               protobuf-compiler,
+               libprotobuf-dev,
+               libopenocean-messages-dev,
+               libivp-helm-dev,
+               libgoby3-dev,
+               libgoby3-moos-dev,
+               goby3-apps,
+               libais-dev,
+               dccl5-compiler,
+               xz-utils
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+Homepage: https://github.com/GobySoft/ivpico
+Vcs-Git: https://github.com/openocean-software/openocean-build.git [projects/ivpico]
+Vcs-Browser: https://github.com/openocean-software/openocean-build/tree/main/projects/ivpico
+
+Package: ivpico
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: IvP helm as a Goby application
+ IvPico runs the IvP helm and the maritime behaviors from MOOS-IvP as
+ first-class applications in other middlewares, rather than through a
+ bridge to MOOS.
+ .
+ This package provides goby_helm_ivp, the helm as a Goby3 application, the
+ ivpico_helm and ivpico_interface libraries it uses, and a plugin for
+ goby_moos_gateway.

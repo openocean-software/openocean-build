@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+IVP_HELM_PREFIX = /usr/lib/$(DEB_HOST_MULTIARCH)/ivp-helm
+
+%:
+	dh $@ --buildsystem=cmake
+
+# Every library it links is on the standard search path, the IvP helm's through libivp-helm0's ld.so.conf.d entry
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_PREFIX_PATH=$(IVP_HELM_PREFIX) -DCMAKE_SKIP_INSTALL_RPATH=ON
+
+# The libraries are private to IvPico's programs and have no SONAME version
+override_dh_makeshlibs:
+	dh_makeshlibs --no-scripts -X libivpico_
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/debian/ivpico/usr/lib/$(DEB_HOST_MULTIARCH)
