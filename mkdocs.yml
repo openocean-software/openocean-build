@@ -1,4 +1,5 @@
 site_name: openocean-build
+site_url: https://build.oceansoft.org/
 repo_url: https://github.com/openocean-software/openocean-build
 docs_dir: docs
 

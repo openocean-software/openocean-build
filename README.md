@@ -22,7 +22,7 @@ We are working to support multiple distribution ecosystems, based on a tiered ap
 
 *This section was written by Claude.*
 
-The [documentation](docs/index.md) covers installing packages, the release, beta and continuous channels, signing and trust, keys, continuous builds and adding a project. Build it with `mkdocs serve` (needs `mkdocs` and `mkdocs-material`).
+The documentation, published at [build.oceansoft.org](https://build.oceansoft.org) (source in [docs/](docs/index.md)), covers installing packages, the release, beta and continuous channels, signing and trust, keys, continuous builds and adding a project. Build it with `mkdocs serve` (needs `mkdocs` and `mkdocs-material`).
 
 For the release channel on Debian trixie, save [`keys/release.asc`](keys/release.asc) (fingerprint `EAD2 78F6 A256 44C2 C559  DBB6 D28A 2EAB 14D2 A9E5`) as `/usr/share/keyrings/openocean-release.asc`, and add `/etc/apt/sources.list.d/openocean.sources`:
 
