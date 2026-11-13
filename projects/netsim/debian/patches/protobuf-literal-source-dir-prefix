@@ -1,0 +1,27 @@
+Description: Strip the source directory from .proto paths literally
+ protobuf_generate_cpp_dccl() removed the source directory from each .proto
+ path with a regular expression built from the path itself. A source
+ directory with a regex metacharacter in its name, such as the '+' in
+ netsim-1.3.1+git0.gb9ad092 (a snapshot's version), then didn't match, and
+ protoc was handed an absolute path joined onto the include directory.
+Author: Toby Schneider <toby@gobysoft.org>
+Bug: https://github.com/GobySoft/netsim/issues/17
+Forwarded: https://github.com/GobySoft/netsim/issues/17
+Last-Update: 2026-11-13
+---
+--- a/cmake_modules/FindProtobufLocal.cmake
++++ b/cmake_modules/FindProtobufLocal.cmake
+@@ -31,7 +31,12 @@
+     # full file name (relative to current source directory)
+     get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+     # relative file name (need to do this in case an absolute path is passed in)
+-    STRING(REGEX REPLACE "^${CMAKE_CURRENT_SOURCE_DIR}/" "" REL_FIL ${ABS_FIL})
++    string(FIND "${ABS_FIL}" "${CMAKE_CURRENT_SOURCE_DIR}/" SOURCE_DIR_POS)
++    set(REL_FIL ${ABS_FIL})
++    if(SOURCE_DIR_POS EQUAL 0)
++      string(LENGTH "${CMAKE_CURRENT_SOURCE_DIR}/" SOURCE_DIR_LEN)
++      string(SUBSTRING "${ABS_FIL}" ${SOURCE_DIR_LEN} -1 REL_FIL)
++    endif()
+     # name without extension, e.g. for "foo.proto", ${FIL_WE} is "foo"
+     get_filename_component(FIL_WE ${REL_FIL} NAME_WE)
+     # relative directory to current source directory, e.g. for "dir/foo.proto", ${FIL_DIR} is "dir"
