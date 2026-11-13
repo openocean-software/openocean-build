@@ -14,6 +14,8 @@ targets:
 
 continuous:
   enabled: true
+  # Its notify-openocean-build.yml starts continuous.yml on each push to 3.0
+  push_dispatch: true
 
 build:
   # Its Build-Depends cover old and new Boost and LLVM with alternatives
