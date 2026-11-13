@@ -1,0 +1,4 @@
+usr/include/goby/moos/*
+usr/lib/*/cmake/goby/goby_moos-config*.cmake
+usr/lib/*/libgoby_moos.so
+usr/lib/*/libgoby_*_moos_gateway_plugin.so

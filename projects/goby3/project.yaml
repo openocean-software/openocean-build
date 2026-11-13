@@ -1,0 +1,21 @@
+upstream:
+  git: https://github.com/GobySoft/goby3.git
+  # Tags are bare versions, like dccl's
+  tag_format: "{version}"
+
+# The release tag, fetched with git and signed by a maintainer.
+source: git
+release:
+  require_signed_tag: true
+
+targets:
+  # The documentation and the Python and Julia packages are built on amd64 only
+  arch_all: amd64
+
+build:
+  # Its Build-Depends cover old and new Boost and LLVM with alternatives
+  resolve_alternatives: true
+
+build_depends:
+  projects: [dccl, mavlink, libais, wt, moos-ivp]
+  repositories: [zenoh]

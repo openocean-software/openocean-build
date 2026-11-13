@@ -126,6 +126,8 @@ def validate(project, config, root=ROOT):
     targets = config.get("targets", {})
     if not targets.get("arch") or not targets.get("dists"):
         raise ConfigError(f"{project}: targets.arch and targets.dists must not be empty")
+    if targets.get("arch_all") is not None and targets["arch_all"] not in targets["arch"]:
+        raise ConfigError(f"{project}: targets.arch_all {targets['arch_all']} isn't one of targets.arch")
     for target in targets["dists"]:
         if set(target) != {"distro", "dist"}:
             raise ConfigError(f"{project}: each of targets.dists needs exactly distro and dist, got {target}")
@@ -325,7 +327,7 @@ def _perl_string(text):
     return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
-def write_sources(sources, directory, mounted_at=None, root=ROOT):
+def write_sources(sources, directory, mounted_at=None, root=ROOT, resolve_alternatives=False):
     """<directory>/apt mirrors /etc/apt (sources.list.d, keyrings, preferences.d);
     <directory>/sbuild.conf adds the same to an sbuild build, with directory seen at mounted_at."""
     directory = Path(directory)
@@ -362,6 +364,8 @@ def write_sources(sources, directory, mounted_at=None, root=ROOT):
         # schroot mode runs a command string with /bin/sh -c
         script = script.replace("%", "%%")
         conf.append(f"push(@{{$external_commands->{{'chroot-setup-commands'}}}}, {_perl_string(script)});")
+    if resolve_alternatives:
+        conf.append("$resolve_alternatives = 1;")
     conf.append("1;")
     (directory / "sbuild.conf").write_text("\n".join(conf) + "\n")
 
@@ -463,7 +467,8 @@ def main(argv):
         config = load(argv[0])
         if argv[2] not in config["channels"]:
             raise ConfigError(f"no channel {argv[2]}")
-        write_sources(build_sources(argv[0], config, *argv[2:5]), argv[5], argv[7] if len(argv) == 8 else None)
+        write_sources(build_sources(argv[0], config, *argv[2:5]), argv[5], argv[7] if len(argv) == 8 else None,
+                      resolve_alternatives=config["build"]["resolve_alternatives"])
         return
     if argv and argv[0] == "order":
         print(json.dumps(build_order(argv[1:])))

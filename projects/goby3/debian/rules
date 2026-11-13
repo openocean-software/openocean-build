@@ -1,0 +1,82 @@
+#!/usr/bin/make -f
+
+export CTEST_OUTPUT_ON_FAILURE=ON
+
+DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_TARGET_ARCH ?= $(shell dpkg-architecture -qDEB_TARGET_ARCH)
+DEB_TARGET_GNU_CPU ?= $(shell dpkg-architecture -qDEB_TARGET_GNU_CPU)
+DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+VERSION_CODENAME ?= $(shell sh -c 'codename=$$(grep "^VERSION_CODENAME=" /etc/os-release 2>/dev/null | head -n1 | cut -d= -f2 | tr -d "\""); if [ -n "$$codename" ]; then echo "$$codename"; else echo unknown; fi')
+
+CMAKE_EXTRA_FLAGS = -Denable_testing=ON
+RUN_TESTS = no
+
+# python3-goby3 is Architecture: all, so like the documentation it is built on the native amd64
+# build only. Pinned off elsewhere rather than left to autodetection, which would otherwise
+# install files into the staging tree that no binary package claims on those builds.
+PYTHON_CMAKE_FLAGS = -Dbuild_python=OFF
+
+ifneq ($(DEB_BUILD_ARCH),$(DEB_TARGET_ARCH))
+        # cross compiling
+	CMAKE_EXTRA_FLAGS += -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=$(DEB_TARGET_GNU_CPU)
+	export CC=$(DEB_HOST_GNU_TYPE)-gcc
+	export CXX=$(DEB_HOST_GNU_TYPE)-g++
+else
+# only run unit tests and build documentation on x86_64
+ifeq ($(shell (dpkg-architecture -qDEB_BUILD_ARCH | egrep -q "amd64") && echo "yes"),yes)
+	CMAKE_EXTRA_FLAGS += -Dbuild_doc=ON
+	RUN_TESTS = yes
+	# dist-packages rather than the interpreter's own purelib: on Debian and derivatives that is
+	# the versioned /usr/local path, which is not where a packaged pure Python module belongs
+	PYTHON_CMAKE_FLAGS = -Dbuild_python=ON -DGOBY_PYTHON_INSTALL_DIR=/usr/lib/python3/dist-packages
+endif
+endif
+
+# Zenoh is 64-bit only here: zenohcxx is packaged Architecture: all but its CMake configuration
+# declares the pointer size of the machine it was built on, so a 32-bit build cannot use it.
+# libzenohc itself cross-installs fine -- it is not Multi-Arch: same, so the host-architecture
+# library replaces rather than joins the build architecture's, which is what a cross build wants.
+ifneq ($(filter $(DEB_TARGET_ARCH),amd64 arm64),)
+CMAKE_EXTRA_FLAGS += -Dbuild_zenoh=ON
+ZENOH_PKGS = -plibgoby3-zenoh -pgoby3-zenoh
+endif
+
+CMAKE_EXTRA_FLAGS += $(PYTHON_CMAKE_FLAGS)
+
+$(info $$DEB_BUILD_ARCH is [${DEB_BUILD_ARCH}])
+$(info $$DEB_TARGET_ARCH is [${DEB_TARGET_ARCH}])
+$(info $$CMAKE_EXTRA_FLAGS is [${CMAKE_EXTRA_FLAGS}])
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CMAKE_EXTRA_FLAGS)
+
+# goby3-test's goby_test_* glob also matches goby_test_tool, which belongs in goby3-apps
+override_dh_install:
+	dh_install
+	rm -f debian/goby3-test/usr/bin/goby_test_tool
+
+override_dh_auto_test:
+ifeq ($(RUN_TESTS),yes)
+	LD_LIBRARY_PATH=$(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/lib dh_auto_test
+endif
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/lib -pgoby3-clang-tool -- --ignore-missing-info
+ifneq ($(ZENOH_PKGS),)
+        # libzenohc has an unversioned SONAME and ships no shlibs file, so no dependency can be
+        # derived from it; control names libzenohc explicitly instead
+	dh_shlibdeps -l$(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/lib $(ZENOH_PKGS) -- --ignore-missing-info
+endif
+	dh_shlibdeps -l$(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)/lib --remaining-packages
+
+override_dh_dwz:
+ifeq ($(VERSION_CODENAME),noble)
+        # Ubuntu noble 24.04 dwz fails on goby_clang_tool with:
+        # "Unknown debugging section .debug_addr"
+	@echo "Skipping dh_dwz on Ubuntu noble due to dwz .debug_addr handling issue"
+else
+	dh_dwz -a
+endif
