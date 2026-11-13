@@ -12,6 +12,9 @@ targets:
   # The documentation and the Python and Julia packages are built on amd64 only
   arch_all: amd64
 
+continuous:
+  enabled: true
+
 build:
   # Its Build-Depends cover old and new Boost and LLVM with alternatives
   resolve_alternatives: true
