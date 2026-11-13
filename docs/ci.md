@@ -12,6 +12,11 @@ Four workflows in `.github/workflows/` build projects. Three of them start on th
 
 The install-test target is `install_test.target`: Ubuntu 26.04 amd64 unless a project sets another.
 
+Two more workflows don't build packages:
+
+- `security.yml`, the weekly [security scan](security.md).
+- `docs.yml`, which publishes this documentation to [build.oceansoft.org](https://build.oceansoft.org) (GitHub Pages) when `docs/` or `mkdocs.yml` changes on `main`.
+
 ## What a change starts
 
 | A change to | The pull request's check builds | Merging it to `main` |
