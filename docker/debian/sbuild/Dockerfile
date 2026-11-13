@@ -63,6 +63,12 @@ RUN case "${DISTRO}" in \
         /srv/chroot/${DIST}-${ARCH} \
         "${MIRROR}"
 
+# A bootstrapped chroot has no /etc/hosts, and the sbuild schroot profile
+# doesn't copy one in, so "localhost" falls through to DNS, which may not know
+# it. Tests that talk to localhost need it, as on Debian's buildds.
+RUN printf '127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n' \
+        > /srv/chroot/${DIST}-${ARCH}/etc/hosts
+
 RUN printf '[%s-%s-sbuild]\ntype=directory\ndirectory=/srv/chroot/%s-%s\nprofile=sbuild\ngroups=sbuild\nroot-groups=sbuild\nunion-type=none\n' \
         "${DIST}" "${ARCH}" "${DIST}" "${ARCH}" \
         > /etc/schroot/chroot.d/${DIST}-${ARCH}-sbuild
