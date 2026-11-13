@@ -112,6 +112,8 @@ DEBIAN_SBUILD_OUTPUT_DIR := $(BUILD_DIR)/$(DISTRO)-$(DIST)-sbuild
 # build, since which of our channels are published can change.
 CHANNEL       ?= release
 SOURCES_DIR   := $(BUILD_DIR)/$(DISTRO)-$(DIST)-$(ARCH)-sources
+# Architecture: all packages are built on this arch only, when the project names one
+ARCH_ALL      := $(shell ci/project-config $(OOS_PACKAGE) get targets.arch_all)
 
 .PHONY: debian debian-docker-image debian-sbuild debian-sbuild-docker-image source clean distclean
 
@@ -179,6 +181,7 @@ debian-sbuild: debian-sbuild-docker-image $(DSC_FILE)
 		--chroot=$(DEBIAN_SBUILD_CHROOT) \
 		--dist=$(DIST) \
 		--arch=$(ARCH) \
+		$(if $(filter-out null $(ARCH),$(ARCH_ALL)),--no-arch-all) \
 		--no-run-lintian --no-run-piuparts --no-run-autopkgtest \
 		--no-clean-source \
 		--debbuildopt=-uc --debbuildopt=-us \

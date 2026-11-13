@@ -3,6 +3,9 @@
 
 targets:
   arch: [amd64, arm64]
+  # Build Architecture: all packages only on this arch, for packaging that
+  # produces them on one architecture only; null builds them on every arch
+  arch_all: null
   dists:
     - { distro: debian, dist: bookworm }
     - { distro: debian, dist: trixie }
@@ -104,6 +107,12 @@ continuous:
   # Upstream version the snapshots follow when no release tag is reachable from
   # the head (a fork without tags, or a branch upstream tags elsewhere)
   version_base: null
+
+build:
+  # Let sbuild satisfy a Build-Depends "a | b" with b. Debian's buildds (and
+  # sbuild by default) only ever install a, so packaging that covers several
+  # distributions with alternatives needs this.
+  resolve_alternatives: false
 
 # What ci/security-scan checks besides OSV and Scorecard (see docs/security.md).
 security:

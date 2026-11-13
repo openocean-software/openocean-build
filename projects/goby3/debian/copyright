@@ -1,0 +1,35 @@
+This work was packaged for Debian by:
+
+    Toby Schneider <tes.aubergine@gmail.com> on Mon, 07 Mar 2011 20:01:02 -0500
+
+It was downloaded from:
+
+    http://github.com/GobySoft/goby3
+ 
+Upstream Author(s):
+
+    Goby Developers: See AUTHORS file
+    Lead: Toby Schneider <toby@gobysoft.org>
+
+Copyright:
+
+    - All files:
+     Copyright 2009-2019 Toby Schneider (https://launchpad.net/~tes)
+                         Massachusetts Institute of Technology (2007-)
+                         Woods Hole Oceanographic Institution (2007-)
+                         Goby Developers Team (https://launchpad.net/~goby-dev)
+
+License:
+
+    Goby is licensed under the LGPL version 3 (libraries)
+    and GPL version 3 (binaries),
+    see "/usr/share/common-licenses/GPL-3",
+    "/usr/share/common-licenses/LGPL-3".    
+
+The Debian packaging is:
+
+    Copyright (C) 2011-2019 Toby Schneider <tes.aubergine@gmail.com>
+
+and is licensed under the GPL version 3,
+see "/usr/share/common-licenses/GPL-3".
+
