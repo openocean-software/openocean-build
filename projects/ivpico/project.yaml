@@ -1,0 +1,27 @@
+# The IvP helm as a Goby app. Upstream has no tags yet, so only continuous
+# snapshots of main are built, versioned from version_base.
+upstream:
+  git: https://github.com/GobySoft/ivpico.git
+source: git
+release:
+  enabled: false
+continuous:
+  enabled: true
+  version_base: 0.0.0
+
+targets:
+  exclude:
+    # openocean-messages isn't built for jammy
+    - { distro: ubuntu, dist: jammy }
+
+build_depends:
+  projects: [openocean-messages, moos-ivp-helm, goby3]
+  repositories: [zenoh]
+
+install_test:
+  packages: [binutils]
+  commands:
+    # Prints its example configuration, so the app and its libraries load
+    - goby_helm_ivp -e | grep -F 'interprocess'
+    # The helm library links the IvP helm libraries, found through libivp-helm0's ld.so.conf.d entry
+    - "! ldd /usr/lib/*/libivpico_helm.so | grep -F 'not found'"
