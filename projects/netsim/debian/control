@@ -1,0 +1,98 @@
+Source: netsim
+Section: science
+Maintainer: Toby Schneider <toby@gobysoft.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               protobuf-compiler,
+               libprotobuf-dev,
+               libdccl5-dev,
+               dccl5-compiler,
+               libgoby3-dev,
+               libgoby3-moos-dev,
+               libgoby3-gui-dev,
+               libmoos10-dev,
+               libboost-serialization-dev,
+               libjack-jackd2-dev
+Build-Depends-Indep: doxygen,
+                     graphviz,
+                     goby3-clang-tool,
+                     clang
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+Homepage: https://github.com/GobySoft/netsim
+Vcs-Git: https://github.com/openocean-software/openocean-build.git [projects/netsim]
+Vcs-Browser: https://github.com/openocean-software/openocean-build/tree/main/projects/netsim
+
+Package: libnetsim
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: underwater acoustic network simulator (libraries)
+ NETSIM simulates underwater acoustic networks: it carries the audio of
+ simulated acoustic modems through an acoustic propagation model, such as
+ Bellhop from the Acoustics Toolbox, so the modems' software can be tested
+ together without water.
+ .
+ This package contains the shared libraries.
+
+Package: libnetsim-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libnetsim (= ${binary:Version}),
+         libgoby3-dev,
+         libgoby3-moos-dev,
+         libgoby3-gui-dev,
+         libjack-jackd2-dev,
+         libboost-serialization-dev,
+         ${misc:Depends}
+Recommends: goby3-interfaces,
+            jackd2
+Description: underwater acoustic network simulator (development files)
+ NETSIM simulates underwater acoustic networks: it carries the audio of
+ simulated acoustic modems through an acoustic propagation model, such as
+ Bellhop from the Acoustics Toolbox, so the modems' software can be tested
+ together without water.
+ .
+ This package contains the headers and the CMake package
+ (find_package(netsim)).
+
+Package: netsim-apps
+Architecture: any
+Depends: libnetsim (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: underwater acoustic network simulator (applications)
+ NETSIM simulates underwater acoustic networks: it carries the audio of
+ simulated acoustic modems through an acoustic propagation model, such as
+ Bellhop from the Acoustics Toolbox, so the modems' software can be tested
+ together without water.
+ .
+ This package contains netsim_core, netsim_udp, netsim_manager,
+ netsim_tool, netsim_postprocess and iBellhop.
+
+Package: netsim-doc
+Section: doc
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: underwater acoustic network simulator (documentation)
+ NETSIM simulates underwater acoustic networks: it carries the audio of
+ simulated acoustic modems through an acoustic propagation model, such as
+ Bellhop from the Acoustics Toolbox, so the modems' software can be tested
+ together without water.
+ .
+ This package contains the HTML documentation.
+
+Package: netsim-interfaces
+Section: doc
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: underwater acoustic network simulator (interface files)
+ NETSIM simulates underwater acoustic networks: it carries the audio of
+ simulated acoustic modems through an acoustic propagation model, such as
+ Bellhop from the Acoustics Toolbox, so the modems' software can be tested
+ together without water.
+ .
+ This package contains the Goby publish/subscribe interface files (YAML)
+ of the NETSIM applications.

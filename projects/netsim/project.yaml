@@ -1,0 +1,41 @@
+upstream:
+  git: https://github.com/GobySoft/netsim.git
+  # Tags are bare versions, like goby3's
+  tag_format: "{version}"
+
+# The release tag, fetched with git and signed by a maintainer.
+source: git
+release:
+  require_signed_tag: true
+
+continuous:
+  enabled: true
+
+targets:
+  # The documentation and interface files are built on amd64 only
+  arch_all: amd64
+
+build_depends:
+  projects: [dccl, moos-ivp, wt, goby3]
+  repositories: [zenoh]
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    # netsim_core needs NETSIM_PROCESSOR_LIBRARY set before it parses its options
+    - "netsim_manager --help 2>&1 | grep -F 'Usage: netsim_manager'"
+    - "netsim_tool --help 2>&1 | grep -F 'Usage: netsim_tool'"
+    - test -f /usr/share/netsim/interfaces/netsim_core_interface.yml
+    # A downstream project finds netsim and links its TCP library. netsim-config.cmake doesn't
+    # find its own dependencies yet (GobySoft/netsim#16), so the consumer finds them first.
+    - mkdir -p /tmp/consumer
+    - |
+      printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(consumer CXX)' 'set(CMAKE_CXX_STANDARD 17)' \
+        'find_package(GOBY 3 REQUIRED zeromq moos)' 'find_package(Boost REQUIRED serialization)' 'find_package(netsim REQUIRED)' \
+        'add_executable(consumer consumer.cpp)' 'target_link_libraries(consumer netsim_tcp)' > /tmp/consumer/CMakeLists.txt
+    - |
+      printf '%s\n' '#include <netsim/tcp/tcp_server.h>' '#include <iostream>' \
+        'int main() { std::cout << "netsim ok" << std::endl; }' > /tmp/consumer/consumer.cpp
+    - cmake -S /tmp/consumer -B /tmp/consumer/build
+    - cmake --build /tmp/consumer/build
+    - /tmp/consumer/build/consumer | grep -Fx 'netsim ok'

@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# The documentation and interface files are the Architecture: all packages
+ifneq (,$(filter netsim-doc,$(shell dh_listpackages)))
+CMAKE_EXTRA_FLAGS += -Dbuild_doc=ON -Dexport_goby_interfaces=ON
+endif
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CMAKE_EXTRA_FLAGS)
