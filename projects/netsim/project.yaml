@@ -17,7 +17,6 @@ targets:
 
 build_depends:
   projects: [dccl, moos-ivp, wt, goby3]
-  repositories: [zenoh]
 
 install_test:
   packages: [cmake, g++, make]
