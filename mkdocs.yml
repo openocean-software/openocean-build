@@ -7,6 +7,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Getting started for member projects: getting-started.md
   - Installing packages: installing.md
   - Channels: channels.md
   - CI: ci.md

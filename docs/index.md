@@ -26,6 +26,7 @@ flowchart LR
     build -->|continuous| conrepo[("apt.oceansoft.org/continuous")]
 ```
 
+- [Getting started for member projects](getting-started.md): what a project needs to be packaged, and the practices that let it do more.
 - [Installing packages](installing.md): apt sources for each channel.
 - [Channels](channels.md): release, beta and continuous, and what goes where.
 - [CI](ci.md): which workflow builds what, and when a project is skipped.
