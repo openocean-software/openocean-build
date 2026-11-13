@@ -8,7 +8,6 @@
 | openocean-messages | [openocean-software/openocean-messages](https://github.com/openocean-software/openocean-messages) | git, signed tags | release, beta (`v*-alpha.N`, `-beta.N`, `-rc.N`) | on each push |
 | dccl | [GobySoft/dccl](https://github.com/GobySoft/dccl) | git, signed tags | release, beta (`*_alphaN`, `_betaN`, `_rcN`) | on each push |
 | moos-ivp-helm | [GobySoft/moos-ivp](https://github.com/GobySoft/moos-ivp), branch `ivp-without-moos` | git | none: snapshots only | every 6 hours |
-| goby3 | [GobySoft/goby3](https://github.com/GobySoft/goby3) | git, signed tags | release | no |
 
 ## Adding a project
 
@@ -39,7 +38,6 @@ continuous:
   enabled: true
 
 targets:
-  # arch_all: amd64                    # build Architecture: all packages on amd64 only
   exclude:
     - { distro: ubuntu, dist: jammy }   # if a dependency is too old there
 

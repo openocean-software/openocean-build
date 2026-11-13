@@ -1,3 +1,0 @@
-usr/include/goby/zenoh/*
-usr/lib/*/cmake/goby/goby_zenoh-config*.cmake
-usr/lib/*/libgoby_zenoh.so
