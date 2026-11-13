@@ -53,6 +53,12 @@ $(info $$CMAKE_EXTRA_FLAGS is [${CMAKE_EXTRA_FLAGS}])
 override_dh_auto_configure:
 	dh_auto_configure -- $(CMAKE_EXTRA_FLAGS)
 
+# Upstream installs the build tree's bin/, so the installed files keep the build RUNPATH
+execute_after_dh_auto_install:
+	find debian/tmp/usr/bin debian/tmp/usr/lib -type f | while read -r f; do \
+		if chrpath -l "$$f" >/dev/null 2>&1; then chrpath -d "$$f"; fi; \
+	done
+
 # goby3-test's goby_test_* glob also matches goby_test_tool, which belongs in goby3-apps
 override_dh_install:
 	dh_install

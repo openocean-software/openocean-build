@@ -21,8 +21,12 @@ build_depends:
   repositories: [zenoh]
 
 install_test:
-  packages: [cmake, g++, make]
+  packages: [binutils, cmake, g++, make]
   commands:
+    # Nothing installed searches the build tree, or the current directory through LD_LIBRARY_PATH
+    - "! find /usr/bin /usr/lib -name '*goby*' -type f -exec readelf -d {} + 2>/dev/null | grep -E 'R(UN)?PATH'"
+    - "! grep -l LD_LIBRARY_PATH /usr/bin/iFrontSeat_* /usr/bin/goby_frontseat_interface_*"
+    - "goby_frontseat_interface_basic_simulator --help 2>&1 | grep -F 'Usage: goby_frontseat_interface'"
     - "gobyd --help 2>&1 | grep -F 'Usage: gobyd'"
     - "pAcommsHandler --help 2>&1 | grep -F 'Usage: pAcommsHandler'"
     - goby_zenoh_tool --help 2>&1 | grep -F 'goby_zenoh_tool.pb.cfg'

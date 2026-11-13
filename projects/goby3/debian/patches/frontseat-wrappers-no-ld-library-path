@@ -1,0 +1,34 @@
+Description: Frontseat wrapper scripts: don't set LD_LIBRARY_PATH, and quote "$@"
+ The generated iFrontSeat_* and goby_frontseat_interface_* scripts prepended
+ the build tree's library directory to LD_LIBRARY_PATH. Installed, that put a
+ build path on the library search path, and with LD_LIBRARY_PATH unset the
+ trailing ':' added the current directory. The driver library is found
+ without it: dlopen() searches the calling executable's RUNPATH (the build
+ tree) and then the standard directories (installed). An unquoted $@ also
+ split arguments containing spaces.
+Author: Toby Schneider <toby@gobysoft.org>
+Forwarded: no
+Last-Update: 2026-11-13
+---
+--- a/src/apps/moos/iFrontSeat/CMakeLists.txt
++++ b/src/apps/moos/iFrontSeat/CMakeLists.txt
+@@ -20,7 +20,7 @@
+   list(GET GOBY_FRONTSEAT_PLUGIN_SHORTNAME_LIST ${i} shortname)
+ 
+   file(WRITE iFrontSeat_${shortname}
+-    "#!/bin/bash\nLD_LIBRARY_PATH=${goby_LIB_DIR}:\$\{LD_LIBRARY_PATH\} IFRONTSEAT_DRIVER_LIBRARY=lib${target}.so.${GOBY_SOVERSION} exec iFrontSeat \$@")
++    "#!/bin/bash\nIFRONTSEAT_DRIVER_LIBRARY=lib${target}.so.${GOBY_SOVERSION} exec iFrontSeat \"\$@\"\n")
+   file(COPY iFrontSeat_${shortname}
+     DESTINATION ${goby_BIN_DIR}
+     FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+--- a/src/apps/zeromq/frontseat_interface/CMakeLists.txt
++++ b/src/apps/zeromq/frontseat_interface/CMakeLists.txt
+@@ -27,7 +27,7 @@
+   list(GET GOBY_FRONTSEAT_PLUGIN_SHORTNAME_LIST ${i} shortname)
+ 
+   file(WRITE goby_frontseat_interface_${shortname}
+-    "#!/bin/bash\nLD_LIBRARY_PATH=${goby_LIB_DIR}:\$\{LD_LIBRARY_PATH\} FRONTSEAT_DRIVER_LIBRARY=lib${target}.so.${GOBY_SOVERSION} exec goby_frontseat_interface \$@")
++    "#!/bin/bash\nFRONTSEAT_DRIVER_LIBRARY=lib${target}.so.${GOBY_SOVERSION} exec goby_frontseat_interface \"\$@\"\n")
+   # copy to get executable permissions set
+   file(COPY goby_frontseat_interface_${shortname}
+     DESTINATION ${goby_BIN_DIR}
