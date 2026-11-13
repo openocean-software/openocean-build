@@ -1,0 +1,21 @@
+Description: Don't link netsim_tcp against libb64
+ netsim_tcp uses only dccl::b64_encode() and dccl::b64_decode(), which DCCL 5
+ implements inline in dccl/binary.h without libb64 (GobySoft/dccl#142).
+ Linking b64 needs libb64 at build time, and exports it to every consumer of
+ netsim_tcp through netsim-config.cmake.
+Author: Toby Schneider <toby@gobysoft.org>
+Bug: https://github.com/GobySoft/netsim/issues/16
+Forwarded: https://github.com/GobySoft/netsim/issues/16#issuecomment-6844866787
+Last-Update: 2026-11-13
+---
+--- a/src/lib/tcp/CMakeLists.txt
++++ b/src/lib/tcp/CMakeLists.txt
+@@ -3,7 +3,7 @@
+   tcp_server.cpp
+   tcp_session.cpp)
+ 
+-target_link_libraries(netsim_tcp ${Boost_LIBRARIES} ${GOBY_LIBRARIES} b64)
++target_link_libraries(netsim_tcp ${Boost_LIBRARIES} ${GOBY_LIBRARIES})
+ 
+ 
+ set_property(TARGET netsim_tcp APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
