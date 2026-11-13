@@ -13,6 +13,7 @@ Build-Depends: debhelper-compat (= 13),
                libgraphicsmagick1-dev,
                libhpdf-dev (<< 2.4.0),
                libpango1.0-dev,
+               libsqlite3-dev,
                libssl-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
@@ -26,7 +27,7 @@ Conflicts: libwt50, libwt-common
 # Earlier versions from packages.gobysoft.org ship the same /usr/share/Wt and /etc/wt
 Breaks: libwt4.11.3, libwt4.13.2
 Replaces: libwt4.11.3, libwt4.13.2
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: libjs-jquery, ${misc:Depends}, ${shlibs:Depends}
 Description: C++ library and application server for web applications [libraries]
  Wt is a web GUI library in modern C++. Quickly develop highly interactive
  web UIs with widgets, without having to write a single line of JavaScript.

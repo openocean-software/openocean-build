@@ -11,4 +11,11 @@ override_dh_auto_configure:
 		-DLIB_INSTALL_DIR=lib/$(DEB_HOST_MULTIARCH) \
 		-DCMAKE_INSTALL_DIR=lib/$(DEB_HOST_MULTIARCH)/cmake \
 		-DBUILD_EXAMPLES=OFF \
-		-DBUILD_TESTS=OFF
+		-DBUILD_TESTS=OFF \
+		-DUSE_SYSTEM_SQLITE3=ON
+
+# WMediaPlayer's jPlayer gets jQuery from libjs-jquery, which has security
+# updates, and no browser runs its Flash fallback.
+execute_after_dh_install:
+	rm debian/libwt4.15.0/usr/share/Wt/resources/jPlayer/jquery.min.js \
+		debian/libwt4.15.0/usr/share/Wt/resources/jPlayer/jquery.jplayer.swf

@@ -1,3 +1,12 @@
+wt (4.15.0-0oos2) trixie; urgency=high
+
+  * Build Wt::Dbo's SQLite backend against the system libsqlite3, not the
+    SQLite 3.35.5 bundled with Wt.
+  * Serve WMediaPlayer's jQuery from libjs-jquery rather than the bundled
+    jQuery 1.4, and drop jPlayer's Flash fallback.
+
+ -- Toby Schneider <toby@gobysoft.org>  Fri, 13 Nov 2026 02:44:19 +0000
+
 wt (4.15.0-0oos1) trixie; urgency=medium
 
   * Package Wt for openocean-build, from upstream tag 4.15.0 and the
