@@ -14,6 +14,9 @@ release:
 install_test:
   packages: [cmake, g++, make, curl]
   commands:
+    # SQLite and jQuery come from the distribution, which carries their security updates
+    - ldd /usr/lib/*/libwtdbosqlite3.so.4.15.0 | grep -F libsqlite3.so.0
+    - test -e /usr/share/Wt/resources/jPlayer/jquery.min.js
     # A Wt application, built with find_package(wt), serves its page over HTTP
     - mkdir -p /tmp/hello
     - |
