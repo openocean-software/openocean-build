@@ -134,6 +134,8 @@ def validate(project, config, root=ROOT):
     for exclude in targets.get("exclude") or []:
         if not {"distro", "dist"} <= set(exclude) <= {"distro", "dist", "arch"}:
             raise ConfigError(f"{project}: each of targets.exclude needs distro and dist (and optionally arch), got {exclude}")
+    if not all(isinstance(c, str) for c in config["install_test"]["commands"]):
+        raise ConfigError(f"{project}: each of install_test.commands must be a string (quote a command containing ': ')")
     install = config["install_test"]["target"]
     if not any(t["install_test"] for t in matrix(config)):
         raise ConfigError(f"{project}: install_test.target {install} is not one of its build targets")

@@ -87,9 +87,9 @@ class ProjectConfigTest(ProjectFixture):
         config = self.load(self.project("p", """
             source: uscan
             install_test:
-              commands: [true]
+              commands: ["true"]
             """))
-        self.assertEqual(config["install_test"]["commands"], [True])
+        self.assertEqual(config["install_test"]["commands"], ["true"])
         # Sibling keys the project didn't set are kept
         self.assertEqual(config["install_test"]["target"]["dist"], "resolute")
         self.assertEqual(config["channels"]["release"]["prefix"], "release/")
@@ -122,6 +122,11 @@ class ProjectConfigTest(ProjectFixture):
             """))
         self.assertEqual([(t["dist"], t["arch"]) for t in project_config.matrix(config)],
                          [("resolute", "amd64")])
+
+    def test_install_test_commands_must_be_strings(self):
+        # An unquoted "grep 'a: b'" is a YAML mapping, not a command
+        with self.assertRaisesRegex(project_config.ConfigError, "must be a string"):
+            self.load(self.project("p", "source: uscan\ninstall_test:\n  commands:\n    - grep -F 'Usage: x'\n"))
 
     def test_arch_all_must_be_a_built_arch(self):
         self.load(self.project("p", "source: uscan\ntargets:\n  arch_all: amd64\n"))

@@ -19,3 +19,27 @@ build:
 build_depends:
   projects: [dccl, mavlink, libais, wt, moos-ivp]
   repositories: [zenoh]
+
+install_test:
+  packages: [cmake, g++, make]
+  commands:
+    - "gobyd --help 2>&1 | grep -F 'Usage: gobyd'"
+    - "pAcommsHandler --help 2>&1 | grep -F 'Usage: pAcommsHandler'"
+    - goby_zenoh_tool --help 2>&1 | grep -F 'goby_zenoh_tool.pb.cfg'
+    # Goby's own tests, against the installed libraries (libzenohc from Eclipse, MOOS from moos-ivp)
+    - goby_test_zenoh_key_expression
+    - goby_test_moos_app_config
+    - python3 -c 'import goby'
+    # A downstream project finds Goby, with the MOOS, ZeroMQ and Zenoh components, and links it
+    - mkdir -p /tmp/consumer
+    - |
+      printf '%s\n' 'cmake_minimum_required(VERSION 3.13)' 'project(consumer CXX)' \
+        'find_package(goby REQUIRED COMPONENTS zeromq moos zenoh)' \
+        'add_executable(version version.cpp)' 'target_link_libraries(version goby goby_zeromq goby_moos goby_zenoh)' > /tmp/consumer/CMakeLists.txt
+    - |
+      printf '%s\n' '#include <goby/version.h>' '#include <goby/time/system_clock.h>' '#include <iostream>' 'int main() {' \
+        '  goby::time::SystemClock::now();' \
+        '  std::cout << "goby " << GOBY_VERSION_MAJOR << "." << GOBY_VERSION_MINOR << "." << GOBY_VERSION_PATCH << std::endl; }' > /tmp/consumer/version.cpp
+    - cmake -S /tmp/consumer -B /tmp/consumer/build
+    - cmake --build /tmp/consumer/build
+    - /tmp/consumer/build/version | grep -Fx 'goby 3.7.0'
